@@ -45,54 +45,54 @@ procedure Main is
 
    type PBlockArguments is access all BlockArguments;
 
-   type Block is access function(a: PBlockArguments) return Boolean;
+   type Block is access function(a: ValuesArray) return Boolean;
 
    type ProgramInstructions is array (Positive range 1 .. 10000) of Block;
 
-   function AddInt(a: PBlockArguments) return Boolean is
+   function AddInt(a: ValuesArray) return Boolean is
    begin
-      a.m(a.args(3)).all.i := a.m(a.args(2)).all.i + a.m(a.args(1)).all.i;
+      a(3).all.i := a(2).all.i + a(1).all.i;
       return True;
    end AddInt;
 
-   function SubInt(a: PBlockArguments) return Boolean is
+   function SubInt(a: ValuesArray) return Boolean is
    begin
-      a.m(a.args(3)).all.i := a.m(a.args(2)).all.i - a.m(a.args(1)).all.i;
+      a(3).all.i := a(2).all.i - a(1).all.i;
       return True;
    end SubInt;
 
-   function MulInt(a: PBlockArguments) return Boolean is
+   function MulInt(a: ValuesArray) return Boolean is
    begin
-      a.m(a.args(3)).all.i := a.m(a.args(2)).all.i * a.m(a.args(1)).all.i;
+      a(3).all.i := a(2).all.i * a(1).all.i;
       return True;
    exception
       when Constraint_Error =>
-         a.m(a.args(3)).all.i := Integer'Last;
+         a(3).all.i := Integer'Last;
          return True;
    end MulInt;
 
-   function DivInt(a: PBlockArguments) return Boolean is
+   function DivInt(a: ValuesArray) return Boolean is
    begin
-      if a.m(a.args(1)).all.i /= 0 then
-         a.m(a.args(3)).all.i := a.m(a.args(2)).all.i / a.m(a.args(1)).all.i;
+      if a(1).all.i /= 0 then
+         a(3).all.i := a(2).all.i / a(1).all.i;
       else
-         a.m(a.args(3)).all.i := Integer'Last;
+         a(3).all.i := Integer'Last;
       end if;
       return True;
    end DivInt;
 
-   function ModInt(a: PBlockArguments) return Boolean is
+   function ModInt(a: ValuesArray) return Boolean is
    begin
-      if a.m(a.args(1)).all.i /= 0 then
-         a.m(a.args(3)).all.i := a.m(a.args(2)).all.i mod a.m(a.args(1)).all.i;
+      if a(1).all.i /= 0 then
+         a(3).all.i := a(2).all.i mod a(1).all.i;
       else
-         a.m(a.args(3)).all.i := 0;
+         a(3).all.i := 0;
       end if;
 
       return True;
    end ModInt;
 
-   function Stop(a: PBlockArguments) return Boolean is
+   function Stop(a: ValuesArray) return Boolean is
    begin
       return False;
    end Stop;
@@ -103,8 +103,8 @@ procedure Main is
    -- memi : IntArray(1 .. 512);
    -- memf : FloatArray(0 .. 511);
 
-   a : PBlockArguments;
-   b : PBlockArguments;
+   a : ValuesArray(1 ..3);
+   b : ValuesArray(1 ..3);
    mem : ValuesArray(1 .. 1024);
    pmem : PValuesArray;
    r : Boolean;
@@ -126,8 +126,8 @@ begin
    pmem(5) := new Value(TInt);
    pmem(6) := new Value(TInt);
 
-   a := new BlockArguments(3, pmem); a.args := (1, 2, 3);
-   b := new BlockArguments(3, pmem); b.args := (3, 4, 5);
+   a := (pmem(1), pmem(2), pmem(3));
+   b := (pmem(3), pmem(4), pmem(5));
 
    for i in 1 .. 10000000 loop
       j := i mod 6 + 1;
