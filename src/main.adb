@@ -21,7 +21,7 @@ procedure Main is
       end case;
    end record;
 
-   type PValue is access Value;
+   type PValue is access all Value;
 
    type PReference is access Reference;
 
@@ -33,8 +33,14 @@ procedure Main is
 
    type ReferencesArray is array(Positive range <>) of PReference;
 
-   type BlockArguments(s : Positive) is record
-      args: ReferencesArray(1 .. s);
+   type ValuesArray is array(Positive range <>) of PValue;
+
+   type PValuesArray is access all ValuesArray;
+
+   type ArgumentsMap is array(Positive range <>) of Positive;
+
+   type BlockArguments(s: Positive; m : PValuesArray) is record
+      args: ArgumentsMap(1 .. s);
    end record;
 
    type PBlockArguments is access all BlockArguments;
@@ -45,38 +51,42 @@ procedure Main is
 
    function AddInt(a: PBlockArguments) return Boolean is
    begin
-      a.args(3).all.i.all := a.args(2).all.i.all + a.args(1).all.i.all;
+      a.m(a.args(3)).all.i := a.m(a.args(2)).all.i + a.m(a.args(1)).all.i;
       return True;
    end AddInt;
 
    function SubInt(a: PBlockArguments) return Boolean is
    begin
-      a.args(3).all.i.all := a.args(1).all.i.all - a.args(2).all.i.all;
+      a.m(a.args(3)).all.i := a.m(a.args(2)).all.i - a.m(a.args(1)).all.i;
       return True;
    end SubInt;
 
    function MulInt(a: PBlockArguments) return Boolean is
    begin
-      a.args(3).all.i.all := a.args(1).all.i.all * a.args(2).all.i.all;
+      a.m(a.args(3)).all.i := a.m(a.args(2)).all.i * a.m(a.args(1)).all.i;
       return True;
+   exception
+      when Constraint_Error =>
+         a.m(a.args(3)).all.i := Integer'Last;
+         return True;
    end MulInt;
 
    function DivInt(a: PBlockArguments) return Boolean is
    begin
-      if a.args(2).all.i.all /= 0 then
-         a.args(3).all.i.all := a.args(1).all.i.all / a.args(2).all.i.all;
+      if a.m(a.args(1)).all.i /= 0 then
+         a.m(a.args(3)).all.i := a.m(a.args(2)).all.i / a.m(a.args(1)).all.i;
       else
-         a.args(3).all.i.all := Integer'Last;
+         a.m(a.args(3)).all.i := Integer'Last;
       end if;
       return True;
    end DivInt;
 
    function ModInt(a: PBlockArguments) return Boolean is
    begin
-      if a.args(2).all.i.all /= 0 then
-         a.args(3).all.i.all := a.args(1).all.i.all mod a.args(2).all.i.all;
+      if a.m(a.args(1)).all.i /= 0 then
+         a.m(a.args(3)).all.i := a.m(a.args(2)).all.i mod a.m(a.args(1)).all.i;
       else
-         a.args(3).all.i.all := 0;
+         a.m(a.args(3)).all.i := 0;
       end if;
 
       return True;
@@ -90,27 +100,34 @@ procedure Main is
    ibs : ProgramInstructions;
 
    -- memb : BoolArray(0 .. 511);
-   memi : IntArray(1 .. 512);
+   -- memi : IntArray(1 .. 512);
    -- memf : FloatArray(0 .. 511);
 
    a : PBlockArguments;
+   b : PBlockArguments;
+   mem : ValuesArray(1 .. 1024);
+   pmem : PValuesArray;
    r : Boolean;
    j : Integer;
 begin
    ibs(1) := AddInt'Access;
    ibs(2) := SubInt'Access;
-   ibs(3) := MulInt'Access;
+   ibs(3) := AddInt'Access;
    ibs(4) := DivInt'Access;
    ibs(5) := ModInt'Access;
    ibs(6) := Stop'Access;
 
-   a := new BlockArguments(3);
-   a.all.args(1) := new Reference(TInt);
-   a.all.args(1).all.i := memi(1)'Access;
-   a.all.args(2) := new Reference(TInt);
-   a.all.args(2).all.i := memi(2)'Access;
-   a.all.args(3) := new Reference(TInt);
-   a.all.args(3).all.i := memi(3)'Access;
+   pmem := new ValuesArray(1 .. 1024);
+
+   pmem(1) := new Value(TInt);
+   pmem(2) := new Value(TInt);
+   pmem(3) := new Value(TInt);
+   pmem(4) := new Value(TInt);
+   pmem(5) := new Value(TInt);
+   pmem(6) := new Value(TInt);
+
+   a := new BlockArguments(3, pmem); a.args := (1, 2, 3);
+   b := new BlockArguments(3, pmem); b.args := (3, 4, 5);
 
    for i in 1 .. 10000000 loop
       j := i mod 6 + 1;
