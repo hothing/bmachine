@@ -76,6 +76,39 @@ package bnew is
    
    -----------------
    
+   type BlockNot is new Block with record
+      i1 : RAny(TBool);
+      q1 : RAny(TBool);
+   end record;
+   
+   procedure DoCalc(b : BlockNot);
+   procedure Init (b : in out BlockNot; i1: PBool; q1 : PBool);
+   
+   type PBlockNot is access BlockNot;
+   
+   type BlockAnd is new BlockNot with record
+      i2 : RAny(TBool);
+   end record;
+   
+   procedure DoCalc(b : BlockAnd);
+   procedure Init (b : in out BlockAnd; i1, i2: PBool; q1 : PBool);
+   
+   type PBlockAnd is access BlockAnd;
+   
+   type BlockOr is new BlockAnd with null record;
+   
+   procedure DoCalc(b : BlockOr);
+   
+   type PBlockOr is access BlockOr;
+   
+   type BlockXor is new BlockAnd with null record;
+   
+   procedure DoCalc(b : BlockXor);
+   
+   type PBlockXor is access BlockXor;
+   
+   -----------------
+   
    package Constructors is
       
       function NewAddI (i1, i2: PInt; q1 : PInt) return PBlock;
@@ -85,6 +118,15 @@ package bnew is
       function NewMulI (i1, i2: PInt; q1 : PInt) return PBlock;
       
       function NewDivI (i1, i2: PInt; q1 : PInt) return PBlock;
+      
+      
+      function NewNot (i1 : PBool; q1 : PBool) return PBlock;
+      
+      function NewAnd (i1, i2: PBool; q1 : PBool) return PBlock;
+      
+      function NewOr (i1, i2: PBool; q1 : PBool) return PBlock;
+      
+      function NewXor (i1, i2: PBool; q1 : PBool) return PBlock;
       
    end Constructors;
    
