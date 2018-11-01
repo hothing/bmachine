@@ -22,6 +22,8 @@ package body bnew is
    -- DoCalc --
    ------------
 
+   pragma Suppress(Overflow_Check);
+
    procedure DoCalc (b : BlockAddI) is
    begin
      b.q1.pi.all := b.i1.pi.all + b.i2.pi.all;
@@ -171,13 +173,15 @@ package body bnew is
 
       j : Integer;
 
+      a, b : Float;
+
    begin
 
       mi(1) := 1;
       mi(2) := 2;
       mi(3) := 3;
-      mi(5) := 10; -- Integer'Last;
-      mi(6) := 5; -- Integer'First;
+      mi(5) := Integer'Last;
+      mi(6) := Integer'First;
       mi(8) := 10;
 
       ibs(1) := Constructors.NewAddI(mi(1)'Access, mi(2)'Access, mi(4)'Access);
@@ -201,6 +205,10 @@ package body bnew is
       Put_Line(mi(4)'Image);
       Put_Line(mb(7)'Image);
 
+      a := Float'Last;
+      b := 1.0 / a;
+
+      Put_Line(b'Image);
    end DoTest;
 
 end bnew;
