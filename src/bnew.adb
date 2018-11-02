@@ -87,6 +87,12 @@ package body bnew is
      b.q1.pb.all := b.i1.pb.all xor b.i2.pb.all;
    end DoCalc;
 
+   procedure DoCalc(b : BlockJump) is
+   begin
+      if b.i1.pb.all then
+         b.q1.pi.all := b.offset;
+      end if;
+   end DoCalc;
 
    --------------------------
 
@@ -157,6 +163,16 @@ package body bnew is
          return PBlock(b);
       end NewXor;
 
+      function NewJump (i1 : PBool; q1 : PInt; offs : Integer) return PBlock is
+         b : PBlockJump;
+      begin
+         b := new BlockJump;
+         b.i1.pb := i1;
+         b.q1.pi := q1;
+         b.offset := offs;
+         return PBlock(b);
+      end NewJump;
+
    end Constructors;
 
 
@@ -169,8 +185,8 @@ package body bnew is
       mb : PMemBool:= new MemBool(1 .. 10);
 
       bz : PBlock;
-
-      ibs : Instructions(1 .. 8);
+      rj : PInt;
+      ibs : Instructions(1 .. 10);
 
       j : Integer;
 
@@ -182,6 +198,8 @@ package body bnew is
    begin
 
       Put_Line("PoC #2");
+
+      rj := new Integer'(0);
 
       mi(1) := 1;
       mi(2) := 2;
@@ -200,14 +218,25 @@ package body bnew is
       ibs(7) := Constructors.NewXor(mb(4)'Access, mb(5)'Access, mb(5)'Access);
       ibs(8) := Constructors.NewAnd(mb(4)'Access, mb(5)'Access, mb(2)'Access);
 
+      ibs(9) := Constructors.NewJump(mb(2)'Access, rj, -2);
+
       tb := Ada.Real_Time.Clock;
 
       j := ibs'First;
       for i in 1 .. 100_000_000 loop
          -- j := i mod ibs'Last + 1;
          bz := ibs(j);
-         Calculate(bz.all);
-         j := j + 1; if j > ibs'Last then j := ibs'First; end if;
+         if bz /= null then
+            Calculate(bz.all);
+         end if;
+         if rj.all /= 0 then
+            j := j + rj.all;
+            j := j mod ibs'Last;
+            rj.all := 0;
+         else
+            j := j + 1;
+         end if;
+         if (j > ibs'Last) or (j < ibs'First) then j := ibs'First; end if;
       end loop;
 
       te := Ada.Real_Time.Clock;

@@ -107,6 +107,16 @@ package bnew is
    
    type PBlockXor is access BlockXor;
    
+   type BlockJump is new Block with record
+      i1 : RAny(TBool);
+      q1 : RAny(TInt);
+      offset : Integer;
+   end record;
+   
+   type PBlockJump is access BlockJump;
+   
+   procedure DoCalc(b : BlockJump);
+   
    -----------------
    
    package Constructors is
@@ -127,6 +137,8 @@ package bnew is
       function NewOr (i1, i2: PBool; q1 : PBool) return PBlock;
       
       function NewXor (i1, i2: PBool; q1 : PBool) return PBlock;
+      
+      function NewJump (i1 : PBool; q1 : PInt; offs : Integer) return PBlock;
       
    end Constructors;
    
