@@ -167,6 +167,7 @@ begin
    ibs(3).args.all := (pmem(5), pmem(7), pmem(6));
    pmem(7).all.i := 1;
    -- NOTE: ^ this is workaround for the raised Exception(ValueOverflow)
+   -- But. How to handle this situation in good way?
 
    ibs(4) := (NotBool'Access, new ValuesArray(1 .. 2));
    ibs(4).args.all := (pmem(9), pmem(10));
