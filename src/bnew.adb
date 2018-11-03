@@ -195,11 +195,14 @@ package body bnew is
       tb, te : Ada.Real_Time.Time;
       dt1 : Ada.Real_Time.Time_Span;
 
+      tr : Boolean;
    begin
 
       Put_Line("PoC #2");
 
       rj := new Integer'(0);
+
+      tr := False;
 
       mi(1) := 1;
       mi(2) := 2;
@@ -251,6 +254,8 @@ package body bnew is
       -- b := 1.0 / a;
 
       -- Put_Line(b'Image);
+      Put_Line(Positive'Image(Boolean'Size));
+      Put_Line(Positive'Image(tr'Size));
    end DoTest;
 
 end bnew;
