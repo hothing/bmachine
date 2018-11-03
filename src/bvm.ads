@@ -59,17 +59,21 @@ package bvm is
    type Routine;
    type PRoutine is access Routine;
    
-   type Routines is array(Positive range Positive'First .. 64) of PRoutine;
+   type RIndex is Positive range Positive'First .. 64;
+   
+   type Routines is array(RIndex) of PRoutine;
+   
+   type Frames is array(RIndex) of PFrame;
    
    type Routine (sc : Positive) is tagged record
       clink  : Routines;  
+      frm    : Frames;      
       calee  : PRoutine;
-      frm    : PFrame;      
       cx     : Code(Positive'First .. sc);
       
       r1, r2, r3, rx : Positive; --  address registers
                                  --  TODO: hide
-                                 
+      ip : Positive;                           
    end record;
    
    procedure Run(e : Routine'Class);
