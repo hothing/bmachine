@@ -3,12 +3,15 @@ with Ada.Real_Time; use Ada.Real_Time;
 
 with bold;
 with bnew;
+with bvm1;
 
 procedure Main is
 
 begin
    --bold.DoTest;
-   bnew.DoTest;
+   --bnew.DoTest;
+   --bvm1.DoTest;
+   bvm1.DoTest2;
 end Main;
 
 -- elapsed time: 00.75s (mode:default; 1e7 instr)
