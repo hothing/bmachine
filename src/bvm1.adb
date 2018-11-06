@@ -46,45 +46,126 @@ package body bvm1 is
    procedure DoTest2 is
       cs : PtrMemorySegment := new MemorySegment(1 .. 128);
       ds : PtrMemorySegment := new MemorySegment(1 .. 128);
-      pc : PtrWView;
-      j : Integer;
+      pc : Positive;
+      cw : PtrWView;
       tb, te : Ada.Real_Time.Time;
       dt1 : Ada.Real_Time.Time_Span;
 
-      procedure AddInt(a1, a2, ar : Positive) is
-         pa1 : PtrWView := (t => B8, pb => ds(a1)'Access);
-         pa2 : PtrWView := (t => B8, pb => ds(a2)'Access);
-         pr  : PtrWView := (t => B8, pb => ds(ar)'Access);
-      begin
-         pr.pw.all := pa1.pw.all + pa2.pw.all;
-      end AddInt;
+      procedure ExecInstr is
+         code : Byte;
+         adr1 : Positive := ds'First;
+         adr2 : Positive := ds'First;
+         adr3 : Positive := ds'First;
 
+         pa1 : PtrWView := (t => B8, pb => ds(adr1)'Access);
+         pa2 : PtrWView := (t => B8, pb => ds(adr2)'Access);
+         pa3 : PtrWView := (t => B8, pb => ds(adr3)'Access);
+
+         procedure AddInt is
+         begin
+            pa3.pw.all := pa1.pw.all + pa2.pw.all;
+         end AddInt;
+
+         procedure SubInt is
+         begin
+            pa3.pw.all := pa1.pw.all - pa2.pw.all;
+         end SubInt;
+
+         procedure MulInt is
+         begin
+            pa3.pw.all := pa1.pw.all * pa2.pw.all;
+         end MulInt;
+
+         procedure DivInt is
+         begin
+            pa3.pw.all := pa1.pw.all / pa2.pw.all;
+         end DivInt;
+
+         function GetAdr return Positive is
+            s : constant Positive := Word16'Size / Byte'Size;
+            npc, adr : Positive;
+         begin
+            npc := pc + s;
+            if npc <= cs'Last and (pc <= cs'Last) then
+               cw.pb := cs(pc)'Access;
+               if (Integer(cw.pw.all) <= ds'Last)
+                 and (Integer(cw.pw.all) >= ds'First)
+               then
+                  adr   := Positive(cw.pw.all);
+               else
+                  -- NB: exceptional case!
+                  --     In real CPU the interrupt will activated
+                  adr := ds'First;
+               end if;
+            else
+               adr := ds'First;
+            end if;
+            if npc < cs'Last then pc := npc; end if;
+            return adr;
+         end GetAdr;
+
+         procedure LoadArgs3 is
+         begin
+            pa1.pb := ds(GetAdr)'Access;
+            pa2.pb := ds(GetAdr)'Access;
+            pa3.pb := ds(GetAdr)'Access;
+         end LoadArgs3;
+
+
+         function GetCode return Byte is
+            s : constant Positive := Byte'Size / Byte'Size;
+            npc : Positive;
+         begin
+            npc := pc + s;
+            if npc <= cs'Last then
+               code := cs(pc);
+            else
+               code := cs(cs'Last);
+            end if;
+            if npc < cs'Last then pc := npc; end if;
+            return code;
+         end GetCode;
+
+      begin
+         case GetCode is
+            when 1 => LoadArgs3; AddInt;
+            when 2 => LoadArgs3; SubInt;
+            when 3 => LoadArgs3; MulInt;
+            when 4 => LoadArgs3; DivInt;
+            when others => null;
+         end case;
+      end ExecInstr;
+
+      s_b8  : constant Positive := Byte'Size / Byte'Size;
+      s_w16 : constant Positive := Word16'Size / Byte'Size;
+      s_w32 : constant Positive := Word32'Size / Byte'Size;
    begin
 
-      ds(1) := 0;
-      ds(2) := 1;
-      ds(3) := 0;
-      ds(4) := 1;
+      declare
+         i : Positive;
+      begin
 
-      pc.pb := ds(1)'Access;
-
-      Put_Line(pc.pw.all'Image);
-
-      for i in cs'Range loop
-         cs(i) := 1; -- add int instruction
-      end loop;
-
+         i := cs'First;
+         while i < (cs'Last - s_w32) loop
+            cs(i) := Byte(i mod 5);
+            i := i + s_b8;
+            cw.pb := cs(i)'Access;
+            cw.pw.all := Word16(ds'First + 1);
+            i := i + s_w16;
+            cw.pb := cs(i)'Access;
+            cw.pw.all := Word16(ds'First + 2);
+            i := i + s_w16;
+            cw.pb := cs(i)'Access;
+            cw.pw.all := Word16(ds'First + 3);
+            i := i + s_w16;
+         end loop;
+      end;
 
       tb := Ada.Real_Time.Clock;
 
-      j := ds'First;
+      pc := cs'First;
       for i in 1 .. 100_000_000 loop
-         case cs(cs'First + (i mod cs'Last)) is
-            when 1 => AddInt(j + 5, j + 3, j);
-            when others => null;
-         end case;
-         j := j + 2;
-         if j > (ds'Last - 8) or j < ds'First then j := ds'First; end if;
+         ExecInstr;
       end loop;
 
       te := Ada.Real_Time.Clock;
