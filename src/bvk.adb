@@ -78,11 +78,12 @@ package body bvk is
 
       pcp := new MemorySegment(0 .. 1023);
 
-      pm  := new Module(0, 1, 1023, 1023);
+      pm  := new Module(1023, 1023);
       pld := new LocalData(128, 128);
 
       p.PC := Address'First;
       p.G := pm;
+      p.L := pld;
       -- Link to a global data
       --pld.gData := pm.data'Access; -- Ooops! This compiler does not accept...
 
@@ -90,8 +91,20 @@ package body bvk is
       for i in pm.code'Range loop
          pm.code(i) := 0;
       end loop;
-
       pm.code(0) := 1;
+
+      -- prepare local data
+      for i in pld.lData'Range loop
+         pld.lData(i) := 0;
+      end loop;
+
+      -- a context stub
+      pcv.pb := pld.lData(4)'Access;
+      c.pd1 := pcv.pd;
+      pcv.pb := pld.lData(8)'Access;
+      c.pd2 := pcv.pd;
+      pcv.pb := pld.lData(12)'Access;
+      c.pd3 := pcv.pd;
 
       -- Cyclic test
       tb := Ada.Real_Time.Clock;
@@ -103,12 +116,9 @@ package body bvk is
                a2 := GetAddr;
                a3 := GetAddr;
                -- simulate a context preparation
-               pcv.pb := pld.lData(4)'Access;
-               c.pd1 := pcv.pd;
-               pcv.pb := pld.lData(8)'Access;
-               c.pd2 := pcv.pd;
-               pcv.pb := pld.lData(12)'Access;
-               c.pd3 := pcv.pd;
+               pcv.pb := pld.lData(a1)'Access; c.pd1 := pcv.pd;
+               pcv.pb := pld.lData(a2)'Access; c.pd2 := pcv.pd;
+               pcv.pb := pld.lData(a3)'Access; c.pd3 := pcv.pd;
                AddInt(c);
             when others => null;
          end case;
@@ -124,3 +134,13 @@ package body bvk is
    end DoTest;
 
 end bvk;
+
+-- [DoTest0] elapsed time: 00.45s (mode:default; 1e8 instr)
+-- [DoTest0] elapsed time: 00.21s (mode:optimize; 1e8 instr)
+-- [DoTest1] elapsed time: 00.67s (mode:default; 1e8 instr)
+-- [DoTest1] elapsed time: 00.16s (mode:optimize; 1e8 instr)
+
+-- [DoTest0] elapsed time: 00.35s (mode:default, w/o checks; 1e8 instr)
+-- [DoTest0] elapsed time: 00.03s (mode:optimize, w/o checks; 1e8 instr)
+-- [DoTest1] elapsed time: 00.41s (mode:default, w/o checks; 1e8 instr)
+-- [DoTest1] elapsed time: 00.15s (mode:optimize, w/o checks; 1e8 instr)

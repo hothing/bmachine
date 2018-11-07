@@ -10,7 +10,7 @@ package bvk is
    subtype Word32 is Unsigned_32;
    subtype Word64 is Unsigned_64;
    
-   subtype Address is Integer;
+   subtype Address is Integer range 0 .. Integer'Last;
    
    type PtrByte is access all Byte;
    type PtrWord16 is access all Word16;
@@ -38,18 +38,18 @@ package bvk is
    
    
    subtype ModArrIndex is Integer range 0 .. 64;   
-   type ModuleRefArray is array (ModArrIndex range <>) of RefModule;
+   type ModuleRefArray is array (ModArrIndex) of RefModule;
    type PtrModRefArray is access ModuleRefArray;
    
    subtype EntArrIndex is Integer range 0 .. 64;
-   type EntriesArray is array (EntArrIndex range <>) of Address;   
+   type EntriesArray is array (EntArrIndex) of Address;   
    type PtrEntriesArray is access EntriesArray;
    
-   type Module(mi : ModArrIndex; ei : EntArrIndex; ds : Address; cs : Address) is record
+   type Module(ds : Address; cs : Address) is record
       data   : aliased MemorySegment(Address'First .. ds);
-      mLink  : ModuleRefArray(ModArrIndex'First .. mi);
-      pt     : EntriesArray(EntArrIndex'First .. ei);          
       code   : MemorySegment(Address'First .. cs);
+      mLink  : ModuleRefArray;
+      pt     : EntriesArray;
       cp     : PtrMemSegment; -- pointer to a global constants segment  
    end record;
    
