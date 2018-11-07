@@ -3,35 +3,75 @@ with Ada.Real_Time; use Ada.Real_Time;
 
 package body bvk is
 
-   procedure AddInt(c : in out Context) is
-      a : Integer := W32ToInt(c.pd1.all);
-      b : Integer := W32ToInt(c.pd2.all);
+   procedure IncR(c : in out Context) is
    begin
-      c.pd3.all := IntToW32(a + b);
-   end AddInt;
+      if c.ri < RStackIndex'Last then
+         c.ri := c.ri + 1;
+      end if;
+   end IncR;
+   --pragma Inline_Always(IncR);
+
+   procedure DecR(c : in out Context) is
+   begin
+      if c.ri > RStackIndex'First then
+         c.ri := c.ri - 1;
+      end if;
+   end DecR;
+   --pragma Inline_Always(DecR);
+
+   function GetCode(c : in out Context) return Byte is
+      s    : constant Positive := Byte'Size / Byte'Size;
+      npc  : Positive;
+      code : Byte;
+   begin
+      if c.PC <= c.G.code'Last then
+         code := c.G.code(c.PC);
+      else
+         code := 0;
+      end if;
+      npc := c.PC + s;
+      if npc < c.G.code'Last then c.PC := npc; end if;
+      return code;
+   end GetCode;
+
+   procedure LLW(c : in out Context) is
+      p2v  : PtrConvert;
+      adr  : Address;
+   begin
+      p2v.pb := c.G.code(c.PC)'Access;
+      adr  := W32ToInt(p2v.pd.all);
+      if adr >= c.L.lData'First and adr <= (c.L.lData'Last - 4) then
+         p2v.pb := c.L.lData(adr)'access;
+         c.ry(c.ri) := p2v.pd.all;
+      end if;
+   end LLW;
+
+   procedure SLW(c : in out Context) is
+      p2v  : PtrConvert;
+      adr  : Address;
+   begin
+      p2v.pb := c.G.code(c.PC)'Access;
+      adr  := W32ToInt(p2v.pd.all);
+      if adr >= c.L.lData'First and adr <= (c.L.lData'Last - 4) then
+         p2v.pb := c.L.lData(adr)'access;
+         p2v.pd.all := c.ry(c.ri);
+      end if;
+   end SLW;
+
+   procedure ADDI(c : in out Context) is
+      p2v  : PtrConvert;
+      a,b  : Integer;
+   begin
+      a := W32ToInt(c.ry(c.ri)); DecR(c);
+      b := W32ToInt(c.ry(c.ri));
+      c.ry(c.ri) := IntToW32(a + b);
+   end ADDI;
 
    ------------
    -- DoTest --
    ------------
 
-   procedure DoTest0 is
-      c   : Context;
-      tb, te : Ada.Real_Time.Time;
-   begin
 
-      -- Simulate a correct context
-      c.pd1 := new Word32'(1);
-      c.pd2 := new Word32'(5);
-      c.pd3 := new Word32'(255);
-
-      -- Cyclic test
-      tb := Ada.Real_Time.Clock;
-      for i in 1 .. 100_000_000 loop
-         AddInt(c);
-      end loop;
-      te := Ada.Real_Time.Clock;
-      Put_Line(Duration'Image(To_Duration(te - tb)));
-   end DoTest0;
 
    procedure DoTest1 is
       c    : Context;
@@ -39,40 +79,7 @@ package body bvk is
       pld  : PtrLocalData;
       pcp  : PtrMemSegment;
       pm   : PtrModule;
-      p    : Process(100);
       tb, te : Ada.Real_Time.Time;
-      a1, a2, a3 : Address;
-
-      function GetCode return Byte is
-         s    : constant Positive := Byte'Size / Byte'Size;
-         npc  : Positive;
-         code : Byte;
-      begin
-         if p.PC <= p.G.code'Last then
-            code := p.G.code(p.PC);
-         else
-            code := 0;
-         end if;
-         npc := p.PC + s;
-         if npc < p.G.code'Last then p.PC := npc; end if;
-         return code;
-      end GetCode;
-
-      function GetAddr return Address is
-         s : constant Positive := Word16'Size / Byte'Size;
-         npc, adr : Address;
-         pcv  : PtrConvert;
-      begin
-         npc := p.PC + s;
-         if npc <= p.G.code'Last then
-            pcv.pb := p.G.code(p.PC)'Access;
-            adr := W32ToInt(pcv.pd.all);
-         else
-            adr := Address'First;
-         end if;
-         if npc < p.G.code'Last then p.PC := npc; end if;
-         return adr;
-      end getaddr;
 
    begin
 
@@ -81,15 +88,17 @@ package body bvk is
       pm  := new Module(1023, 1023);
       pld := new LocalData(128, 128);
 
-      p.PC := Address'First;
-      p.G := pm;
-      p.L := pld;
+      c.PC := Address'First;
+      c.G := pm;
+      c.L := pld;
+      c.ri := RStackIndex'First;
+
       -- Link to a global data
       --pld.gData := pm.data'Access; -- Ooops! This compiler does not accept...
 
       -- Prepare code
       for i in pm.code'Range loop
-         pm.code(i) := 0;
+         pm.code(i) := Byte(i mod 4);
       end loop;
       pm.code(0) := 1;
 
@@ -98,28 +107,13 @@ package body bvk is
          pld.lData(i) := 0;
       end loop;
 
-      -- a context stub
-      pcv.pb := pld.lData(4)'Access;
-      c.pd1 := pcv.pd;
-      pcv.pb := pld.lData(8)'Access;
-      c.pd2 := pcv.pd;
-      pcv.pb := pld.lData(12)'Access;
-      c.pd3 := pcv.pd;
-
       -- Cyclic test
       tb := Ada.Real_Time.Clock;
       for i in 1 .. 100_000_000 loop
-         case GetCode is
-            when 1 =>
-               -- simulate an arguments read
-               a1 := GetAddr;
-               a2 := GetAddr;
-               a3 := GetAddr;
-               -- simulate a context preparation
-               pcv.pb := pld.lData(a1)'Access; c.pd1 := pcv.pd;
-               pcv.pb := pld.lData(a2)'Access; c.pd2 := pcv.pd;
-               pcv.pb := pld.lData(a3)'Access; c.pd3 := pcv.pd;
-               AddInt(c);
+         case GetCode(c) is
+            when 1 => LLW(c);
+            when 2 => SLW(c);
+            when 3 => ADDI(c);
             when others => null;
          end case;
       end loop;
@@ -127,10 +121,18 @@ package body bvk is
       Put_Line(Duration'Image(To_Duration(te - tb)));
    end DoTest1;
 
+   procedure DoTest2 is
+      a, b, c : Bit;
+   begin
+      a := true;
+      b := false;
+      c := a and b;
+   end DoTest2;
+
    procedure DoTest is
    begin
-      DoTest0;
       DoTest1;
+      DoTest2;
    end DoTest;
 
 end bvk;

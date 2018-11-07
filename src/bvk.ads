@@ -3,14 +3,25 @@ with Ada.Unchecked_Conversion;
 
 package bvk is
 
-   type DataFormat is (W8, W16, W32, W64, W80);
-
+   type DataFormat is (B8, W8, W16, W32, W64, W80);
+   
    subtype Byte is Unsigned_8;
    subtype Word16 is Unsigned_16;
    subtype Word32 is Unsigned_32;
    subtype Word64 is Unsigned_64;
    
    subtype Address is Integer range 0 .. Integer'Last;
+   
+   
+   type Bit is new Boolean;
+   for Bit'Size use 1;
+   
+   subtype BitAddress is Byte range 0 .. 7;
+   type BitField is array(BitAddress) of Bit;
+   for BitField'Size use 8;
+   pragma Pack (BitField);
+   
+   type PtrBitField is access all BitField;
    
    type PtrByte is access all Byte;
    type PtrWord16 is access all Word16;
@@ -19,8 +30,9 @@ package bvk is
    
    type PtrConvert (t : DataFormat := W8) is record
       case t is
+         when B8 => px : PtrBitField;
          when W8 => pb : PtrByte;
-         when W16 => pw: PtrWord16;
+         when W16 => pw : PtrWord16;
          when W32 => pd : PtrWord32;
          when W64 => pq : PtrWord64;
          when W80 => pl : PtrWord64;  -- FIXME later!
@@ -34,8 +46,6 @@ package bvk is
    type Module;
    type PtrModule is access Module;
    type RefModule is access PtrModule;
-   
-   
    
    subtype ModArrIndex is Integer range 0 .. 64;   
    type ModuleRefArray is array (ModArrIndex) of RefModule;
@@ -65,23 +75,21 @@ package bvk is
       --retPC       : Address;  -- a code pointer for return (should be removed???)
    end record;
    
+   subtype RStackIndex is Byte range 0 .. 7;
+   type RStack is array(RStackIndex) of Word32;
+   type FStack is array(RStackIndex) of Float;
+   
    type Context is record
-      data  : PtrLocalData;
-      pb1   : PtrByte;
-      pb2   : PtrByte;
-      pb3   : PtrByte;
-      pw1   : PtrWord16;
-      pw2   : PtrWord16;
-      pw3   : PtrWord16;
-      pd1   : PtrWord32;
-      pd2   : PtrWord32;
-      pd3   : PtrWord32;
-      pq1   : PtrWord64;
-      pq2   : PtrWord64;
-      pq3   : PtrWord64;
-      cb    : Byte;
-      ci    : Integer;
-      cf    : Float;
+      G    : PtrModule; -- pointer to a Module 
+      L    : PtrLocalData; -- pointer to a P-stack
+      PC   : Address; -- the actual code address in the Module.code
+      p2v  : PtrConvert;
+      ry   : RStack;
+      ri   : RStackIndex;
+      fx   : FStack;
+      fi   : RStackIndex;
+      bf   : BitField;
+      bi   : BitAddress;
    end record;   
    type PtrContext is access Context;   
    
