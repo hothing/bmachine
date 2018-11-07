@@ -12,8 +12,24 @@ package bvk is
    
    subtype Address is Integer;
    
+   type PtrByte is access all Byte;
+   type PtrWord16 is access all Word16;
+   type PtrWord32 is access all Word32;
+   type PtrWord64 is access all Word64;
+   
+   type PtrConvert (t : DataFormat := W8) is record
+      case t is
+         when W8 => pb : PtrByte;
+         when W16 => pw: PtrWord16;
+         when W32 => pd : PtrWord32;
+         when W64 => pq : PtrWord64;
+         when W80 => pl : PtrWord64;  -- FIXME later!
+      end case;
+   end record;
+   pragma Unchecked_Union(PtrConvert);
+   
    type MemorySegment is array (Address range <>) of aliased Byte;
-   type PtrMemSegment is access MemorySegment;
+   type PtrMemSegment is access all MemorySegment;
    
    type Module;
    type PtrModule is access Module;
@@ -46,8 +62,28 @@ package bvk is
       gData       : PtrMemSegment; -- reference to a module data
       upLink      : PtrLocalData;  -- link to a parent function P-stack 
       dynLink     : PtrLocalData; -- link to a local data of a callee
-      retPC       : Address;  -- a code pointer for return (should be removed???)
+      --retPC       : Address;  -- a code pointer for return (should be removed???)
    end record;
+   
+   type Context is record
+      data  : PtrLocalData;
+      pb1   : PtrByte;
+      pb2   : PtrByte;
+      pb3   : PtrByte;
+      pw1   : PtrWord16;
+      pw2   : PtrWord16;
+      pw3   : PtrWord16;
+      pd1   : PtrWord32;
+      pd2   : PtrWord32;
+      pd3   : PtrWord32;
+      pq1   : PtrWord64;
+      pq2   : PtrWord64;
+      pq3   : PtrWord64;
+      cb    : Byte;
+      ci    : Integer;
+      cf    : Float;
+   end record;   
+   type PtrContext is access Context;   
    
    type AddrArray is array (Address range <>) of Address;
       
@@ -59,6 +95,18 @@ package bvk is
       rp  : Address; -- a top of RS
    end record;
    
-  procedure DoTest;
+   function IntToW32 is new
+     Ada.Unchecked_Conversion(Integer, Word32);
+
+   function W32ToInt is new
+     Ada.Unchecked_Conversion(Word32, Integer);
+
+   function W32ToFloat is new
+     Ada.Unchecked_Conversion(Word32, Float);
+
+   function FloatToW32 is new
+     Ada.Unchecked_Conversion(Float, Word32);
+   
+   procedure DoTest;
    
 end bvk;
