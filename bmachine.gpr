@@ -5,7 +5,6 @@ project Bmachine is
    for Main use ("main.adb");
 
    package Compiler is
-      for Switches ("ada") use ("-gnato", "-gnatp", "-fstack-check");
    end Compiler;
 
 end Bmachine;
