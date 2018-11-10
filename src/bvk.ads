@@ -20,8 +20,39 @@ package bvk is
    for BitField'Size use 8;
    pragma Pack (BitField);
       
-   type MemorySegment is array (Address range <>) of Word32;
+   type MemorySegment is array (Address range <>) of aliased Word32;
    type PtrMemSegment is access all MemorySegment;
+   
+   type PtrWord32 is access all Word32;
+   
+   type OpCode(code : Byte := 16#FF#) is record
+      dummy : Byte;
+      case code is
+         when 16#00# .. 16#1f# =>
+            adr : Address;
+            v  : Word32;
+         when 16#20# .. 16#2f# =>
+            adr1, 
+            adr2 : Address;
+         when 16#30# .. 16#3f# =>
+            ad1, ad2, ad3 : Address;
+         when 16#40# .. 16#4f# =>
+            r1, r2, r3 : Word32;
+         when others =>
+            null;
+      end case;
+   end record;
+   --pragma Unchecked_Union(OpCode);
+   pragma Pack(OpCode);
+   
+   type Instruction is tagged record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   pragma Pack(Instruction);
+   type PtrInstruction is access Instruction'Class;
+   
+   procedure exec(ins : in out Instruction'Class);
+   procedure impl_opcode(ins : in out Instruction);
    
    type Module;
    type PtrModule is access Module;
