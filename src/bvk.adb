@@ -6,6 +6,9 @@ package body bvk is
    type Inst_AddInt is new Instruction with null record;
    procedure impl_opcode(ins : in out Inst_AddInt);
 
+   type Inst2_AddInt is new Instruction2 with null record;
+   procedure impl_opcode(ins : in out Inst2_AddInt);
+
    function call (self : in out MuFunction) return FunctionResult is
    begin
       return Failure;
@@ -30,6 +33,21 @@ package body bvk is
    procedure impl_opcode(ins : in out Inst_AddInt) is
    begin
       ins.p3.all := ins.p1.all +ins.p2.all;
+   end impl_opcode;
+
+   procedure exec(ins : in out Instruction2'Class) is
+   begin
+      impl_opcode(ins);
+   end exec;
+
+   procedure impl_opcode(ins : in out Instruction2) is
+   begin
+      null;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst2_AddInt) is
+   begin
+      ins.fx.frame.sData(ins.r3) := ins.fx.frame.sData(ins.r1) + ins.fx.frame.sData(ins.r2);
    end impl_opcode;
 
    ------------
@@ -83,12 +101,41 @@ package body bvk is
       Put_Line(Word32'Image(pcp.all(0)));
    end DoTest2;
 
+   procedure DoTest3 is
+      pld  : PtrLocalData;
+      pi   : PtrInstruction2;
+
+      tb, te : Ada.Real_Time.Time;
+   begin
+
+      pld := new LocalData(128, 8);
+
+      pld.all.sData(0) := 0;
+      pld.all.sData(1) := 1;
+
+      pi := new Inst2_AddInt;
+      pi.r1 := 0;
+      pi.r2 := 1;
+      pi.r3 := 0;
+      pi.fx := new MuFunction(16);
+      pi.fx.frame := pld;
+
+      tb := Ada.Real_Time.Clock;
+      for i in 1 .. 100_000_000 loop
+         exec(pi.all);
+      end loop;
+      te := Ada.Real_Time.Clock;
+      Put_Line(Duration'Image(To_Duration(te - tb)));
+      Put_Line(Word32'Image(pld.all.sData(0)));
+   end DoTest3;
+
    procedure DoTest is
    begin
       DoTest1;
       DoTest2;
-      Put_Line(Integer'Image(OpCode'Size / Byte'Size));
+      DoTest3;
       Put_Line(Integer'Image(Instruction'Size / Byte'Size));
+      Put_Line(Integer'Image(Instruction2'Size / Byte'Size));
    end DoTest;
 
 end bvk;
