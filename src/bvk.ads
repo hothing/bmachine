@@ -10,9 +10,8 @@ package bvk is
    subtype Word32 is Unsigned_32;
    subtype Word64 is Unsigned_64;
    
-   subtype Address is Integer range 0 .. Integer'Last;
-   
-   
+   subtype Address is Word32 range 0 .. Word32'Last / (2 * Word32'Size / Byte'Size);
+      
    type Bit is new Boolean;
    for Bit'Size use 1;
    
@@ -20,87 +19,68 @@ package bvk is
    type BitField is array(BitAddress) of Bit;
    for BitField'Size use 8;
    pragma Pack (BitField);
-   
-   type PtrBitField is access all BitField;
-   
-   type PtrByte is access all Byte;
-   type PtrWord16 is access all Word16;
-   type PtrWord32 is access all Word32;
-   type PtrWord64 is access all Word64;
-   
-   type PtrConvert (t : DataFormat := W8) is record
-      case t is
-         when B8 => px : PtrBitField;
-         when W8 => pb : PtrByte;
-         when W16 => pw : PtrWord16;
-         when W32 => pd : PtrWord32;
-         when W64 => pq : PtrWord64;
-         when W80 => pl : PtrWord64;  -- FIXME later!
-      end case;
-   end record;
-   pragma Unchecked_Union(PtrConvert);
-   
-   type MemorySegment is array (Address range <>) of aliased Byte;
+      
+   type MemorySegment is array (Address range <>) of Word32;
    type PtrMemSegment is access all MemorySegment;
    
    type Module;
    type PtrModule is access Module;
    type RefModule is access PtrModule;
    
-   subtype ModArrIndex is Integer range 0 .. 64;   
-   type ModuleRefArray is array (ModArrIndex) of RefModule;
-   type PtrModRefArray is access ModuleRefArray;
-   
-   subtype EntArrIndex is Integer range 0 .. 64;
-   type EntriesArray is array (EntArrIndex) of Address;   
-   type PtrEntriesArray is access EntriesArray;
-   
-   type Module(ds : Address; cs : Address) is record
-      data   : aliased MemorySegment(Address'First .. ds);
-      code   : MemorySegment(Address'First .. cs);
-      mLink  : ModuleRefArray;
-      pt     : EntriesArray;
-      cp     : PtrMemSegment; -- pointer to a global constants segment  
-   end record;
-   
    type LocalData;
    type PtrLocalData is access LocalData;
    
-   type LocalData(ds : Address; ps : Address) is record
-      lData       : aliased MemorySegment(Address'First .. ds); -- local data
-      cParam      : MemorySegment(Address'First .. ps); -- parameters for a function call
-      gData       : PtrMemSegment; -- reference to a module data
-      upLink      : PtrLocalData;  -- link to a parent function P-stack 
-      dynLink     : PtrLocalData; -- link to a local data of a callee
-      --retPC       : Address;  -- a code pointer for return (should be removed???)
+   subtype ModArrIndex is Address range 0 .. 64;   
+   type ModuleRefArray is array (ModArrIndex) of RefModule;
+   type PtrModRefArray is access ModuleRefArray;
+   
+   type FunctionResult is (Stop, Run, Finish, Failure);
+   
+   type MuFunction(cs : Address) is record
+      frame  : PtrLocalData;                                                                                               
+      code   : MemorySegment(Address'First .. cs); -- byte-code
+      PC     : Address; -- program counter / instruction pointer
+      r1, r2, r3 : Address; -- internal word32 registers 
+      x1, x2, x3 : BitAddress; -- internal bit address registers
    end record;
+   type PtrMuFunction is access MuFunction;
    
-   subtype RStackIndex is Byte range 0 .. 7;
-   type RStack is array(RStackIndex) of Word32;
-   type FStack is array(RStackIndex) of Float;
+   function call (self : in out MuFunction) return FunctionResult;
+   function execCode (self :  in out MuFunction) return FunctionResult;
    
-   type Context is record
-      G    : PtrModule; -- pointer to a Module 
-      L    : PtrLocalData; -- pointer to a P-stack
-      PC   : Address; -- the actual code address in the Module.code
-      p2v  : PtrConvert;
-      ry   : RStack;
-      ri   : RStackIndex;
-      fx   : FStack;
-      fi   : RStackIndex;
-      bf   : BitField;
-      bi   : BitAddress;
-   end record;   
-   type PtrContext is access Context;   
+   subtype FuncArrIndex is Address range 0 .. 64;
+   type FuncArray is array (FuncArrIndex) of PtrMuFunction;   
+   type FuncMap is array(FuncArrIndex range <>) of FuncArrIndex;
    
    type AddrArray is array (Address range <>) of Address;
+   
+   type VariableAddress is record
+      modId  : ModArrIndex;
+      varId  : Address range 0 .. 65535;
+   end record;
+   for VariableAddress'Size use 32;
+   pragma Pack(VariableAddress);
+   
+   type Module(ds : Address; ev, ef : Address) is record
+      expv   : AddrArray(Address'First .. ev); -- exported variables table (id -> offset)
+      expf   : FuncMap(FuncArrIndex'First .. ef); -- exported functions (id -> id)
       
-   type Process(ss : Address) is record
-      G   : PtrModule; -- pointer to a Module 
-      L   : PtrLocalData; -- pointer to a P-stack
-      PC  : Address; -- the actual code address in the Module.code 
-      rs  : AddrArray(Address'First .. ss); -- a return call stack
-      rp  : Address; -- a top of RS
+      -- PRIVATE PART -- 
+      data   : MemorySegment(Address'First .. ds);
+      mLink  : ModuleRefArray;
+      func   : FuncArray;
+      cp     : PtrMemSegment; -- pointer to a global constants segment  
+   end record;
+   
+   
+   type LocalData(ds : Address; N : Address) is record
+      sData   : MemorySegment(Address'First .. ds); -- static data
+                                                   -- NB: first N words are reserved
+                                                   -- they are used as instruction registers
+                                                   -- and for parameters
+      gData   : PtrModule; -- reference to a own module
+       
+      upLink  : PtrLocalData;  -- link to a parent function variables 
    end record;
    
    function IntToW32 is new
@@ -115,6 +95,12 @@ package bvk is
    function FloatToW32 is new
      Ada.Unchecked_Conversion(Float, Word32);
    
+   function VarAddrToW32 is new
+     Ada.Unchecked_Conversion(VariableAddress, Word32);
+   
+   function W32ToVarAddr is new
+     Ada.Unchecked_Conversion(Word32, VariableAddress);
+      
    procedure DoTest;
    
 end bvk;

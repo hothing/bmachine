@@ -3,130 +3,158 @@ with Ada.Real_Time; use Ada.Real_Time;
 
 package body bvk is
 
-   procedure IncR(c : in out Context) is
+   function call (self : in out MuFunction) return FunctionResult is
    begin
-      if c.ri < RStackIndex'Last then
-         c.ri := c.ri + 1;
-      end if;
-   end IncR;
-   --pragma Inline_Always(IncR);
+      return Failure;
+   end call;
 
-   procedure DecR(c : in out Context) is
+   function execCode (self :  in out MuFunction) return FunctionResult is
    begin
-      if c.ri > RStackIndex'First then
-         c.ri := c.ri - 1;
-      end if;
-   end DecR;
-   --pragma Inline_Always(DecR);
+      return Failure;
+   end execCode;
 
-   function GetCode(c : in out Context) return Byte is
-      s    : constant Positive := Byte'Size / Byte'Size;
-      npc  : Positive;
-      code : Byte;
-   begin
-      if c.PC <= c.G.code'Last then
-         code := c.G.code(c.PC);
-      else
-         code := 0;
-      end if;
-      npc := c.PC + s;
-      if npc < c.G.code'Last then c.PC := npc; end if;
-      return code;
-   end GetCode;
-
-   procedure LLW(c : in out Context) is
-      p2v  : PtrConvert;
-      adr  : Address;
-   begin
-      p2v.pb := c.G.code(c.PC)'Access;
-      adr  := W32ToInt(p2v.pd.all);
-      if adr >= c.L.lData'First and adr <= (c.L.lData'Last - 4) then
-         p2v.pb := c.L.lData(adr)'access;
-         c.ry(c.ri) := p2v.pd.all;
-      end if;
-   end LLW;
-
-   procedure SLW(c : in out Context) is
-      p2v  : PtrConvert;
-      adr  : Address;
-   begin
-      p2v.pb := c.G.code(c.PC)'Access;
-      adr  := W32ToInt(p2v.pd.all);
-      if adr >= c.L.lData'First and adr <= (c.L.lData'Last - 4) then
-         p2v.pb := c.L.lData(adr)'access;
-         p2v.pd.all := c.ry(c.ri);
-      end if;
-   end SLW;
-
-   procedure ADDI(c : in out Context) is
-      p2v  : PtrConvert;
-      a,b  : Integer;
-   begin
-      a := W32ToInt(c.ry(c.ri)); DecR(c);
-      b := W32ToInt(c.ry(c.ri));
-      c.ry(c.ri) := IntToW32(a + b);
-   end ADDI;
 
    ------------
    -- DoTest --
    ------------
 
-
-
    procedure DoTest1 is
-      c    : Context;
-      pcv  : PtrConvert;
       pld  : PtrLocalData;
       pcp  : PtrMemSegment;
       pm   : PtrModule;
-      tb, te : Ada.Real_Time.Time;
-
    begin
 
       pcp := new MemorySegment(0 .. 1023);
 
-      pm  := new Module(1023, 1023);
+      pm  := new Module(1023, 16, 256);
+      pm.cp := pcp;
+
       pld := new LocalData(128, 128);
 
-      c.PC := Address'First;
-      c.G := pm;
-      c.L := pld;
-      c.ri := RStackIndex'First;
-
-      -- Link to a global data
-      --pld.gData := pm.data'Access; -- Ooops! This compiler does not accept...
-
-      -- Prepare code
-      for i in pm.code'Range loop
-         pm.code(i) := Byte(i mod 4);
-      end loop;
-      pm.code(0) := 1;
-
-      -- prepare local data
-      for i in pld.lData'Range loop
-         pld.lData(i) := 0;
-      end loop;
-
-      -- Cyclic test
-      tb := Ada.Real_Time.Clock;
-      for i in 1 .. 100_000_000 loop
-         case GetCode(c) is
-            when 1 => LLW(c);
-            when 2 => SLW(c);
-            when 3 => ADDI(c);
-            when others => null;
-         end case;
-      end loop;
-      te := Ada.Real_Time.Clock;
-      Put_Line(Duration'Image(To_Duration(te - tb)));
    end DoTest1;
 
    procedure DoTest2 is
-      a, b, c : Bit;
+      a : MemorySegment(0 .. 256);
+
+      type W16Bytes is record
+         h : Byte;
+         l : Byte;
+      end record;
+      for W16Bytes'Size use 16;
+      pragma Pack(W16Bytes);
+
+      type W32Bytes is new MemorySegment(0..3);
+      for W32Bytes'Size use 32;
+      pragma Pack(W32Bytes);
+
+      function W16ToBytes is new
+           Ada.Unchecked_Conversion(Word16, W16Bytes);
+
+      function BytesToW16 is new
+           Ada.Unchecked_Conversion(W16Bytes, Word16);
+
+      function W32ToBytes is new
+           Ada.Unchecked_Conversion(Word32, W32Bytes);
+
+      function BytesToW32 is new
+           Ada.Unchecked_Conversion(W32Bytes, Word32);
+
+      function ReadW16(m : in out MemorySegment;
+                       offset : Address)
+                       return Word16
+      is
+         v : W16Bytes;
+      begin
+         v.h := m(offset);
+         v.l := m(offset + 1);
+         return BytesToW16(v);
+      end ReadW16;
+
+      function ReadW32(m : in out MemorySegment;
+                       offset : Address)
+                       return Word32
+      is
+      begin
+         return BytesToW32(W32Bytes(m(offset .. offset + 3)));
+      end ReadW32;
+      pragma Inline(ReadW32);
+
+      procedure WriteW32(m : in out MemorySegment;
+                         offset : Address;
+                         val : Word32)
+      is
+      begin
+         m(offset .. offset + 3) := MemorySegment(W32ToBytes(val));
+      end WriteW32;
+      pragma Inline(WriteW32);
+
+      procedure OpArgs(arg : in out MemorySegment) is
+         p2v : PtrConvert(B8);
+      begin
+         arg(arg'First + 0) := 1;
+         --p2v.pb := arg(0)'Access;
+      end OpArgs;
+
+      type MuFunc(lds   : Integer) is record
+         codes : MemorySegment(0..255);
+         pc    : Integer;
+      end record;
+
+      procedure SimLocalData(n : in Integer) is
+         ds : MemorySegment(0 .. n);
+      begin
+         ds(0) := 129;
+      end SimLocalData;
+
+      procedure exec(mf : in out MuFunc) is
+         ds : MemorySegment(0 .. mf.lds);
+         p2v : PtrConvert;
+      begin
+         ds(0) := 129;
+      end exec;
+
+      function AddW32(v1, v2: Word32) return Word32 is
+      begin
+         return v1 + v2;
+      end AddW32;
+
+      func1 : MuFunc(512);
+      func2 : MuFunc(16);
+      vw    : Word16 := 123;
+      vd1, vd2    : Word32 := 415;
+      tb, te : Ada.Real_Time.Time;
    begin
-      a := true;
-      b := false;
-      c := a and b;
+      OpArgs( a(2..3) );
+      exec(func1);
+      exec(func2);
+
+      tb := Ada.Real_Time.Clock;
+
+      WriteW32(a, a'First, 0);
+      WriteW32(a, a'First + Word32'Size / Byte'Size, 1);
+      for i in 1 .. 100_000_000 loop
+         vd1 := ReadW32(a, a'First);
+         vd2 := ReadW32(a, a'First + Word32'Size / Byte'Size);
+         WriteW32(a, a'First, vd1 + vd2);
+      end loop;
+      te := Ada.Real_Time.Clock;
+
+      vd1 := ReadW32(a, a'First);
+      Put_Line(Word32'Image(vd1));
+      Put_Line(Duration'Image(To_Duration(te - tb)));
+
+      tb := Ada.Real_Time.Clock;
+
+      vd1 := 0;
+      vd2 := 1;
+      for i in 1 .. 100_000_000 loop
+         --vd1 := vd1 + vd2;
+         vd2 := Word32(i mod 2);
+         vd1 := AddW32(vd1, vd2);
+      end loop;
+      te := Ada.Real_Time.Clock;
+      Put_Line(Duration'Image(To_Duration(te - tb)));
+      Put_Line(Word32'Image(vd1));
    end DoTest2;
 
    procedure DoTest is

@@ -12,6 +12,11 @@ and boolean logic.
 
 BF[0] is used as RLO for the boolena operations.
 
+Byte address has 32-bits.
+Bit address has 32-bit and the format:
+   3-bit [31:29] = bit offset, 29-bit[28:0] = byte offset.
+
+
 +--------------+------------+--------------------------------------------------+
 |OpCode        |Format      |Description                                       |
 |              |            |                                                  |
