@@ -11,18 +11,31 @@ package bvk is
    subtype Word64 is Unsigned_64;
    
    subtype Address is Word32 range 0 .. Word32'Last / (2 * Word32'Size / Byte'Size);
-      
+   
+   type Bool is new Boolean;
+   for Bool'Size use 8;
+   
    type Bit is new Boolean;
    for Bit'Size use 1;
    
-   subtype BitAddress is Byte range 0 .. 7;
+   subtype BitAddress is Byte range 0 .. 31;
    type BitField is array(BitAddress) of Bit;
-   for BitField'Size use 8;
+   for BitField'Size use Word32'Size;
    pragma Pack (BitField);
+   
+   type W32Bits(t : Boolean := False) is record
+      case t is
+         when False => w : Word32;
+         when True => x : BitField;
+      end case;
+   end record;
+   pragma Unchecked_Union(W32Bits);
+   pragma Pack(W32Bits);
       
    type MemorySegment is array (Address range <>) of aliased Word32;
    type PtrMemSegment is access all MemorySegment;
    
+   type PtrBool is access all Bool;
    type PtrWord32 is access all Word32;
    
    type Module;
@@ -30,44 +43,30 @@ package bvk is
    type RefModule is access PtrModule;
    
    type LocalData;
-   type PtrLocalData is access LocalData;
+   type PtrLocalData is access LocalData;  
    
-   subtype ModArrIndex is Address range 0 .. 64;   
-   type ModuleRefArray is array (ModArrIndex) of RefModule;
-   type PtrModRefArray is access ModuleRefArray;
-   
-   type FunctionResult is (Stop, Run, Finish, Failure);
-   
-   type MuFunction(cs : Address) is record
-      frame  : PtrLocalData;                                                                                               
-      code   : MemorySegment(Address'First .. cs); -- byte-code
-      PC     : Address; -- program counter / instruction pointer
-      r1, r2, r3 : Address; -- internal word32 registers 
-      x1, x2, x3 : BitAddress; -- internal bit address registers
-   end record;
-   type PtrMuFunction is access MuFunction;
-   
-   function call (self : in out MuFunction) return FunctionResult;
-   function execCode (self :  in out MuFunction) return FunctionResult;
-   
-   type Instruction is tagged record
-      p1, p2, p3 : PtrWord32;
-   end record;
-   pragma Pack(Instruction);
+   type Instruction is tagged null record;
    type PtrInstruction is access Instruction'Class;
    
    procedure exec(ins : in out Instruction'Class);
    procedure impl_opcode(ins : in out Instruction);
    
-   type Instruction2 is tagged record
-      r1, r2, r3 : Address;
-      fx  : PtrMuFunction;
-   end record;
-   pragma Pack(Instruction2);
-   type PtrInstruction2 is access Instruction2'Class;
+   type FunctionResult is (Stop, Run, Finish, Failure);
+   type MuCodeLine is array(Address range <>) of PtrInstruction;
    
-   procedure exec(ins : in out Instruction2'Class);
-   procedure impl_opcode(ins : in out Instruction2);
+   type MuFunction(cs : Address) is record
+      frame  : PtrLocalData;                                                                                               
+      code   : MuCodeLine(Address'First .. cs); -- mu-code
+      PC     : Address; -- program counter / instruction pointer
+   end record;
+   type PtrMuFunction is access MuFunction;
+   
+   procedure call (self : in out MuFunction);
+   function execCode (self :  in out MuFunction) return FunctionResult;
+   
+   subtype ModArrIndex is Address range 0 .. 64;   
+   type ModuleRefArray is array (ModArrIndex) of RefModule;
+   type PtrModRefArray is access ModuleRefArray;
    
    subtype FuncArrIndex is Address range 0 .. 64;
    type FuncArray is array (FuncArrIndex) of PtrMuFunction;   
