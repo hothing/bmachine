@@ -3,7 +3,7 @@ with Ada.Unchecked_Conversion;
 
 package bvmkf is
 
-   type DataFormat is (B8, W8, W16, W32, W64, W80);
+   type DataFormat is (B8, W8, W16, W32, W64, MU_RECORD);
    
    subtype Byte is Unsigned_8;
    subtype Word16 is Unsigned_16;
@@ -48,15 +48,39 @@ package bvmkf is
    type LocalData;
    type PtrLocalData is access all LocalData;  
    
-   type LocalData(ds : Address; N : Address) is record
+   type LocalData(ds : Address; N : Address; gData   : Boolean) is record
       sData   : aliased MemorySegment(ds); -- static data
                                                    -- NB: first N words are reserved
                                                    -- they are used as instruction registers
                                                    -- and for parameters
-      gData   : PtrModule; -- reference to a own module
-       
       upLink  : PtrLocalData;  -- link to a parent function variables 
    end record;
+   
+   type Cell;
+   type PtrCell is access all Cell;
+   type MuRecord is array (Address range <>) of PtrCell; 
+   type PtrMuRecord is access MuRecord;
+   
+   type Cell(rec : Boolean) is record
+      case rec is
+         when False => v : aliased Word32;
+         when True => r : PtrMuRecord;
+      end case;
+   end record;   
+   pragma Pack(Cell);
+   
+   type Value(t : DataFormat) is record
+      case t is
+         when B8 => bx : aliased BitField;
+         when W8 => v8 : aliased Byte;
+         when W16 => v16 : aliased Word16;
+         when W32 => v32 : aliased Word32;
+         when W64 => v64 : aliased Word64;
+         when MU_RECORD => r : PtrMuRecord;
+         when others => null;            
+      end case;
+   end record; 
+   --pragma Pack(Value);
    
    type Instruction is tagged null record;
    type PtrInstruction is access Instruction'Class;
@@ -68,7 +92,7 @@ package bvmkf is
    type MuCodeLine is array(Address range <>) of PtrInstruction;
    
    type MuFunction(cs : Address; ds : Address; N : Address) is record
-      frame  : aliased LocalData(ds, N); -- parameters and static data                                                                                              
+      frame  : aliased LocalData(ds, N, False); -- parameters and static data                                                                                              
       code   : MuCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
       res    : FunctionResult;

@@ -132,8 +132,6 @@ package body bvmkf is
       pf  := new MuFunction(16, 120, 4);
       pf2 := new MuFunction(16, 120, 4);
 
-      pf.frame.gData := pm;
-      pf2.frame.gData := pm;
       pf2.frame.upLink := pf.frame'Access;
 
       pi := new Inst_AddInt'(p1 => pcp.all.m(0)'Access,
@@ -150,11 +148,25 @@ package body bvmkf is
       Put_Line(Word32'Image(pcp.all.m(0)));
    end DoTest2;
 
+   procedure DoTest3 is
+      vb : Value(W8);
+      vl : Value(W32);
+      vc : Cell(False);
+      pc : Cell(True);
+   begin
+      Put_Line("Data formats sizes");
+      Put_Line(Integer'Image(Instruction'Size / Byte'Size));
+      Put_Line(Integer'Image(vb'Size / Byte'Size));
+      Put_Line(Integer'Image(vl'Size / Byte'Size));
+      Put_Line(Integer'Image(vc'Size / Byte'Size));
+      Put_Line(Integer'Image(pc'Size / Byte'Size));
+   end DoTest3;
+
    procedure DoTest is
    begin
       DoTest1;
       DoTest2;
-      Put_Line(Integer'Image(Instruction'Size / Byte'Size));
+      DoTest3;
    end DoTest;
 
 end bvmkf;

@@ -2,15 +2,15 @@ with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Real_Time; use Ada.Real_Time;
 
 with bvmks;
+with bvmkf;
 
 procedure Main is
 
 begin
-   --bold.DoTest;
-   --bnew.DoTest;
-   --bvm1.DoTest;
-   --bvm1.DoTest2;
+   Put_Line("VM-KS");
    bvmks.DoTest;
+   Put_Line("VM-KF");
+   bvmkf.DoTest;
 end Main;
 
 -- elapsed time: 00.75s (mode:default; 1e7 instr)
