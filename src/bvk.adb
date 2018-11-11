@@ -9,22 +9,27 @@ package body bvk is
    procedure impl_opcode(ins : in out Inst_AddInt);
 
    type Inst_Jump is new Instruction with record
-      offset : Address;
       func   : PtrMuFunction;
+      offset : Address;
    end record;
    procedure impl_opcode(ins : in out Inst_Jump);
 
    type Inst_Call is new Instruction with record
-      extFunc   : PtrMuFunction;
+      extFunc  : PtrMuFunction;
    end record;
    procedure impl_opcode(ins : in out Inst_Call);
 
    type Inst_CallParam is new Instruction with record
-      extFunc  : PtrMuFunction; -- called function
+      extFunc  : PtrMuFunction; -- a calling function
       arg      : PtrWord32; -- pointer to the value
       id       : Address; -- id of a function argument
    end record;
    procedure impl_opcode(ins : in out Inst_CallParam);
+
+   type Inst_Return is new Instruction with record
+      func   : PtrMuFunction; -- a called function
+   end record;
+   procedure impl_opcode(ins : in out Inst_Return);
 
    procedure exec(ins : in out Instruction'Class) is
    begin
@@ -38,7 +43,7 @@ package body bvk is
 
    procedure impl_opcode(ins : in out Inst_AddInt) is
    begin
-      ins.p3.all := ins.p1.all +ins.p2.all;
+      ins.p3.all := ins.p1.all + ins.p2.all;
    end impl_opcode;
 
    procedure impl_opcode(ins : in out Inst_Jump) is
@@ -48,30 +53,36 @@ package body bvk is
 
    procedure impl_opcode(ins : in out Inst_Call) is
    begin
-      if ins.extFunc /= null then
-         call(ins.extFunc.all);
-      end if;
+      call(ins.extFunc.all);
+      -- TODO: may be to set some boolean flag to inform that
+      -- the call has been finished with Failure or not.
+      -- [ins.extFunc.res]
    end impl_opcode;
 
    procedure impl_opcode(ins : in out Inst_CallParam) is
    begin
-      if ins.extFunc /= null then
-         if ins.extFunc.frame /= null then
-            -- how to avoid this^ check??
-            ins.extFunc.frame.sData(ins.id) := ins.arg.all;
-         end if;
-      end if;
+      -- I void to check the extFunc and paramID because
+      -- this can be done in a binding stage
+      -- ASSERT(ins.id < ins.extFunc.frame.N)
+      ins.extFunc.frame.sData.m(ins.id) := ins.arg.all;
+   end impl_opcode;
+
+
+   procedure impl_opcode(ins : in out Inst_Return) is
+   begin
+      ins.func.res := FcExit;
    end impl_opcode;
    ------
 
    procedure call (self : in out MuFunction) is
       pi : PtrInstruction;
    begin
+      self.res := FcExec;
       for i in self.code'Range loop
          pi := self.code(i);
-         if pi /= null then
-            exec(pi.all);
-         else
+         -- ASSERT(pi /= null) - can be checked in a binding stage
+         exec(pi.all);
+         if self.res /= FcExec then
             exit;
          end if;
       end loop;
@@ -79,7 +90,7 @@ package body bvk is
 
    function execCode (self :  in out MuFunction) return FunctionResult is
    begin
-      return Failure;
+      return FcFailure;
    end execCode;
 
    ------------
@@ -103,25 +114,31 @@ package body bvk is
    end DoTest1;
 
    procedure DoTest2 is
-      pld  : PtrLocalData;
-      pcp  : PtrMemSegment;
+      pcp, ps  : PtrMemSegment;
       pm   : PtrModule;
       pi   : PtrInstruction;
+      pf, pf2   : PtrMuFunction;
 
       tb, te : Ada.Real_Time.Time;
    begin
-      pcp := new MemorySegment(0 .. 1023);
-      pcp.all(0) := 0;
-      pcp.all(1) := 1;
+      pcp := new MemorySegment(1023);
+      pcp.all.m(0) := 0;
+      pcp.all.m(1) := 1;
 
       pm  := new Module(1023, 4, 4);
       pm.cp := pcp;
+      ps := pm.data'Access;
 
-      pld := new LocalData(128, 8);
+      pf  := new MuFunction(16, 120, 4);
+      pf2 := new MuFunction(16, 120, 4);
 
-      pi := new Inst_AddInt'(p1 => pcp.all(0)'Access,
-                             p2 => pcp.all(1)'Access,
-                             p3 => pcp.all(0)'Access
+      pf.frame.gData := pm;
+      pf2.frame.gData := pm;
+      pf2.frame.upLink := pf.frame'Access;
+
+      pi := new Inst_AddInt'(p1 => pcp.all.m(0)'Access,
+                             p2 => pcp.all.m(1)'Access,
+                             p3 => pcp.all.m(0)'Access
                             );
 
       tb := Ada.Real_Time.Clock;
@@ -130,7 +147,7 @@ package body bvk is
       end loop;
       te := Ada.Real_Time.Clock;
       Put_Line(Duration'Image(To_Duration(te - tb)));
-      Put_Line(Word32'Image(pcp.all(0)));
+      Put_Line(Word32'Image(pcp.all.m(0)));
    end DoTest2;
 
    procedure DoTest is

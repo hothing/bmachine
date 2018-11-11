@@ -31,8 +31,11 @@ package bvk is
    end record;
    pragma Unchecked_Union(W32Bits);
    pragma Pack(W32Bits);
-      
-   type MemorySegment is array (Address range <>) of aliased Word32;
+   
+   type MemoryBlock is array (Address range <>) of aliased Word32;
+   type MemorySegment(s: Address) is record
+      m : MemoryBlock(Address'First .. s);
+   end record;   
    type PtrMemSegment is access all MemorySegment;
    
    type PtrBool is access all Bool;
@@ -43,7 +46,17 @@ package bvk is
    type RefModule is access PtrModule;
    
    type LocalData;
-   type PtrLocalData is access LocalData;  
+   type PtrLocalData is access all LocalData;  
+   
+   type LocalData(ds : Address; N : Address) is record
+      sData   : aliased MemorySegment(ds); -- static data
+                                                   -- NB: first N words are reserved
+                                                   -- they are used as instruction registers
+                                                   -- and for parameters
+      gData   : PtrModule; -- reference to a own module
+       
+      upLink  : PtrLocalData;  -- link to a parent function variables 
+   end record;
    
    type Instruction is tagged null record;
    type PtrInstruction is access Instruction'Class;
@@ -51,13 +64,14 @@ package bvk is
    procedure exec(ins : in out Instruction'Class);
    procedure impl_opcode(ins : in out Instruction);
    
-   type FunctionResult is (Stop, Run, Finish, Failure);
+   type FunctionResult is (FcExec, FcExit, FcFailure);
    type MuCodeLine is array(Address range <>) of PtrInstruction;
    
-   type MuFunction(cs : Address) is record
-      frame  : PtrLocalData;                                                                                               
+   type MuFunction(cs : Address; ds : Address; N : Address) is record
+      frame  : aliased LocalData(ds, N); -- parameters and static data                                                                                              
       code   : MuCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
+      res    : FunctionResult;
    end record;
    type PtrMuFunction is access MuFunction;
    
@@ -86,22 +100,12 @@ package bvk is
       expf   : FuncMap(FuncArrIndex'First .. ef); -- exported functions (id -> id)
       
       -- PRIVATE PART -- 
-      data   : MemorySegment(Address'First .. ds);
+      data   : aliased MemorySegment(ds);
       mLink  : ModuleRefArray;
       func   : FuncArray;
       cp     : PtrMemSegment; -- pointer to a global constants segment  
    end record;
    
-   
-   type LocalData(ds : Address; N : Address) is record
-      sData   : MemorySegment(Address'First .. ds); -- static data
-                                                   -- NB: first N words are reserved
-                                                   -- they are used as instruction registers
-                                                   -- and for parameters
-      gData   : PtrModule; -- reference to a own module
-       
-      upLink  : PtrLocalData;  -- link to a parent function variables 
-   end record;
    
    function IntToW32 is new
      Ada.Unchecked_Conversion(Integer, Word32);
