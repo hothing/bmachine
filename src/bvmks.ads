@@ -1,7 +1,7 @@
 with Interfaces; use Interfaces;
 with Ada.Unchecked_Conversion;
 
-package bvk is
+package bvmks is
 
    type DataFormat is (B8, W8, W16, W32, W64, W80);
    
@@ -127,4 +127,4 @@ package bvk is
       
    procedure DoTest;
    
-end bvk;
+end bvmks;

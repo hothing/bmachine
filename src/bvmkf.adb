@@ -1,7 +1,7 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Real_Time; use Ada.Real_Time;
 
-package body bvk is
+package body bvmkf is
 
    type Inst_AddInt is new Instruction with record
       p1, p2, p3 : PtrWord32;
@@ -157,4 +157,4 @@ package body bvk is
       Put_Line(Integer'Image(Instruction'Size / Byte'Size));
    end DoTest;
 
-end bvk;
+end bvmkf;
