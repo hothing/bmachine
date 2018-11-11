@@ -4,7 +4,7 @@ with Ada.Real_Time; use Ada.Real_Time;
 package body bvmks is
 
    type Inst_AddInt is new Instruction with record
-      p1, p2, p3 : PtrWord32;
+      p1, p2, p3 : Reference;
    end record;
    procedure impl_opcode(ins : in out Inst_AddInt);
 
@@ -21,7 +21,7 @@ package body bvmks is
 
    type Inst_CallParam is new Instruction with record
       extFunc  : PtrMuFunction; -- a calling function
-      arg      : PtrWord32; -- pointer to the value
+      arg      : Reference; -- pointer to the value
       id       : Address; -- id of a function argument
    end record;
    procedure impl_opcode(ins : in out Inst_CallParam);
@@ -43,7 +43,9 @@ package body bvmks is
 
    procedure impl_opcode(ins : in out Inst_AddInt) is
    begin
-      ins.p3.all := ins.p1.all + ins.p2.all;
+      ins.p3.frame.all.sData.m(ins.p3.offset) :=
+        ins.p1.frame.all.sData.m(ins.p1.offset)
+        + ins.p2.frame.all.sData.m(ins.p2.offset);
    end impl_opcode;
 
    procedure impl_opcode(ins : in out Inst_Jump) is
@@ -64,7 +66,8 @@ package body bvmks is
       -- I void to check the extFunc and paramID because
       -- this can be done in a binding stage
       -- ASSERT(ins.id < ins.extFunc.frame.N)
-      ins.extFunc.frame.sData.m(ins.id) := ins.arg.all;
+      ins.extFunc.frame.sData.m(ins.id) :=
+        ins.arg.frame.all.sData.m(ins.arg.offset);
    end impl_opcode;
 
 
@@ -114,10 +117,10 @@ package body bvmks is
    end DoTest1;
 
    procedure DoTest2 is
-      pcp, ps  : PtrMemSegment;
+      pcp  : PtrMemSegment;
       pm   : PtrModule;
       pi   : PtrInstruction;
-      pf, pf2   : PtrMuFunction;
+      --pf, pf2   : PtrMuFunction;
 
       tb, te : Ada.Real_Time.Time;
    begin
@@ -127,19 +130,16 @@ package body bvmks is
 
       pm  := new Module(1023, 4, 4);
       pm.cp := pcp;
-      ps := pm.data'Access;
 
-      pf  := new MuFunction(16, 120, 4);
-      pf2 := new MuFunction(16, 120, 4);
+      pm.data.sData.m(0) := 0;
+      pm.data.sData.m(1) := 1;
+      pi := new Inst_AddInt'(p1 => Reference'( frame => pm.data'Access,
+                                               offset => 0, size => 1),
+                             p2 => Reference'( frame => pm.data'Access,
+                                               offset => 1, size => 1),
+                             p3 => Reference'( frame => pm.data'Access,
+                                               offset => 0, size => 1));
 
-      pf.frame.gData := pm;
-      pf2.frame.gData := pm;
-      pf2.frame.upLink := pf.frame'Access;
-
-      pi := new Inst_AddInt'(p1 => pcp.all.m(0)'Access,
-                             p2 => pcp.all.m(1)'Access,
-                             p3 => pcp.all.m(0)'Access
-                            );
 
       tb := Ada.Real_Time.Clock;
       for i in 1 .. 100_000_000 loop
@@ -147,7 +147,7 @@ package body bvmks is
       end loop;
       te := Ada.Real_Time.Clock;
       Put_Line(Duration'Image(To_Duration(te - tb)));
-      Put_Line(Word32'Image(pcp.all.m(0)));
+      Put_Line(Word32'Image(pm.data.sData.m(0)));
    end DoTest2;
 
    procedure DoTest is

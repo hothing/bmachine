@@ -48,15 +48,19 @@ package bvmks is
    type LocalData;
    type PtrLocalData is access all LocalData;  
    
-   type LocalData(ds : Address; N : Address) is record
+   type LocalData(ds : Address; N : Address; gData   : Boolean) is record
       sData   : aliased MemorySegment(ds); -- static data
                                                    -- NB: first N words are reserved
                                                    -- they are used as instruction registers
                                                    -- and for parameters
-      gData   : PtrModule; -- reference to a own module
-       
+       -- gData = the module data       
       upLink  : PtrLocalData;  -- link to a parent function variables 
    end record;
+   
+   type Reference(offset  : Address := 0; size : Address := 1) is record
+      frame  : PtrLocalData;      
+   end record;
+   type PtrReference is access all Reference;
    
    type Instruction is tagged null record;
    type PtrInstruction is access Instruction'Class;
@@ -68,7 +72,7 @@ package bvmks is
    type MuCodeLine is array(Address range <>) of PtrInstruction;
    
    type MuFunction(cs : Address; ds : Address; N : Address) is record
-      frame  : aliased LocalData(ds, N); -- parameters and static data                                                                                              
+      frame  : aliased LocalData(ds, N, False); -- parameters and static data                                                                                              
       code   : MuCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
       res    : FunctionResult;
@@ -100,7 +104,7 @@ package bvmks is
       expf   : FuncMap(FuncArrIndex'First .. ef); -- exported functions (id -> id)
       
       -- PRIVATE PART -- 
-      data   : aliased MemorySegment(ds);
+      data   : aliased LocalData(ds, ds, True);
       mLink  : ModuleRefArray;
       func   : FuncArray;
       cp     : PtrMemSegment; -- pointer to a global constants segment  
