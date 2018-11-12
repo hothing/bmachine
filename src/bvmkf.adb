@@ -8,6 +8,22 @@ package body bvmkf is
    end record;
    procedure impl_opcode(ins : in out Inst_AddInt);
 
+   type Inst_GetElem is new Instruction with record
+      local : PtrLocalData;
+      base  : Address;
+      id    : Address;
+      tgt   : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_GetElem);
+
+   type Inst_GetElemDyn is new Instruction with record
+      local   : PtrLocalData;
+      base    : Address;
+      dyn_id  : PtrWord32;
+      tgt     : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_GetElemDyn);
+
    type Inst_Jump is new Instruction with record
       func   : PtrMuFunction;
       offset : Address;
@@ -46,6 +62,18 @@ package body bvmkf is
       ins.p3.all := ins.p1.all + ins.p2.all;
    end impl_opcode;
 
+   procedure impl_opcode(ins : in out Inst_GetElem) is
+   begin
+      ins.tgt.all := ins.local.sData.m(ins.base + ins.id);
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_GetElemDyn) is
+      id : Address;
+   begin
+      id := ins.dyn_id.all;
+      ins.tgt.all := ins.local.sData.m(ins.base + id);
+   end impl_opcode;
+
    procedure impl_opcode(ins : in out Inst_Jump) is
    begin
       ins.func.PC := ins.func.PC + ins.offset;
@@ -81,7 +109,11 @@ package body bvmkf is
       for i in self.code'Range loop
          pi := self.code(i);
          -- ASSERT(pi /= null) - can be checked in a binding stage
-         exec(pi.all);
+         if pi /= null then
+            exec(pi.all);
+         else
+            exit;
+         end if;
          if self.res /= FcExec then
             exit;
          end if;
@@ -97,6 +129,8 @@ package body bvmkf is
    -- DoTest --
    ------------
 
+   testInstructions : constant Integer := 100_000_000;
+
    procedure DoTest1 is
       vd1, vd2 : Word32;
       tb, te : Ada.Real_Time.Time;
@@ -104,7 +138,7 @@ package body bvmkf is
       tb := Ada.Real_Time.Clock;
       vd1 := 0;
       vd2 := 1;
-      for i in 1 .. 100_000_000 loop
+      for i in 1 .. testInstructions loop
          vd2 := Word32(i mod 2);
          vd1 := vd1 + vd2;
       end loop;
@@ -114,38 +148,50 @@ package body bvmkf is
    end DoTest1;
 
    procedure DoTest2 is
-      pcp, ps  : PtrMemSegment;
       pm   : PtrModule;
-      pi   : PtrInstruction;
       pf, pf2   : PtrMuFunction;
-
+      n, m : Integer;
       tb, te : Ada.Real_Time.Time;
    begin
-      pcp := new MemorySegment(1023);
-      pcp.all.m(0) := 0;
-      pcp.all.m(1) := 1;
 
       pm  := new Module(1023, 4, 4);
-      pm.cp := pcp;
-      ps := pm.data'Access;
-
       pf  := new MuFunction(16, 120, 4);
       pf2 := new MuFunction(16, 120, 4);
 
       pf2.frame.upLink := pf.frame'Access;
 
-      pi := new Inst_AddInt'(p1 => pcp.all.m(0)'Access,
-                             p2 => pcp.all.m(1)'Access,
-                             p3 => pcp.all.m(0)'Access
-                            );
+      pf.frame.sData.m(0) := 0;
+      pf.frame.sData.m(1) := 1;
+      pf.frame.sData.m(2) := 0;
+      pf.frame.sData.m(3) := 0;
+      pf.frame.sData.m(4) := 0;
 
+      pf.code(0) := new Inst_AddInt'(p1 => pf.frame.sData.m(0)'Access,
+                                     p2 => pf.frame.sData.m(1)'Access,
+                                     p3 => pf.frame.sData.m(0)'Access
+                                    );
+
+      pf.code(1) := new Inst_GetElem'( local => pf.frame'Access,
+                                       base => 10,
+                                       id => 2,
+                                       tgt => pf.frame.sData.m(5)'Access
+                                    );
+      pf.code(2) := new Inst_GetElemDyn'( local => pf.frame'Access,
+                                       base => 10,
+                                       dyn_id => pf.frame.sData.m(3)'Access,
+                                       tgt => pf.frame.sData.m(4)'Access
+                                      );
+
+      N := 3;
+      M := testInstructions / N;
       tb := Ada.Real_Time.Clock;
-      for i in 1 .. 100_000_000 loop
-         exec(pi.all);
+      for i in 1 .. M loop
+         --exec(pi.all);
+         call(pf.all);
       end loop;
       te := Ada.Real_Time.Clock;
       Put_Line(Duration'Image(To_Duration(te - tb)));
-      Put_Line(Word32'Image(pcp.all.m(0)));
+      Put_Line(Word32'Image(pf.frame.sData.m(0)));
    end DoTest2;
 
    procedure DoTest3 is
