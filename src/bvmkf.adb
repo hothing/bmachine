@@ -3,6 +3,8 @@ with Ada.Real_Time; use Ada.Real_Time;
 
 package body bvmkf is
 
+   -- [Integer instructions]
+
    type Inst_AddInt is new Instruction with record
       p1, p2, p3 : PtrWord32;
    end record;
@@ -28,6 +30,41 @@ package body bvmkf is
    end record;
    procedure impl_opcode(ins : in out Inst_ModInt);
 
+   -- [Float32 instructions]
+
+   type Inst_AddFloat is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_AddFloat);
+
+   type Inst_SubFloat is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_SubFloat);
+
+   type Inst_MulFloat is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_MulFloat);
+
+   type Inst_DivFloat is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_DivFloat);
+
+   -- [Convertion W32 <-> Float]
+
+   type Inst_Word2Float is new Instruction with record
+      p1, p2 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_Word2Float);
+
+   type Inst_Round is new Instruction with record
+      p1, p2 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_Round);
+
+   -- [ControlFlow + Structural access instructions]
    type Inst_GetElem is new Instruction with record
       local : PtrLocalData;
       base  : Address;
@@ -79,6 +116,8 @@ package body bvmkf is
 
    --------------------------------------------------
 
+   -- [Integer instructions]
+
    procedure impl_opcode(ins : in out Inst_AddInt) is
    begin
       ins.p3.all := ins.p1.all + ins.p2.all;
@@ -103,6 +142,42 @@ package body bvmkf is
    begin
       ins.p3.all := ins.p1.all mod ins.p2.all;
    end impl_opcode;
+
+   -- [Float32 instructions]
+
+   procedure impl_opcode(ins : in out Inst_AddFloat) is
+   begin
+      ins.p3.all := FloatToW32(W32ToFloat(ins.p1.all) + W32ToFloat(ins.p2.all));
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_SubFloat) is
+   begin
+      ins.p3.all := FloatToW32(W32ToFloat(ins.p1.all) - W32ToFloat(ins.p2.all));
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_MulFloat) is
+   begin
+      ins.p3.all := FloatToW32(W32ToFloat(ins.p1.all) * W32ToFloat(ins.p2.all));
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_DivFloat) is
+   begin
+      ins.p3.all := FloatToW32(W32ToFloat(ins.p1.all) / W32ToFloat(ins.p2.all));
+   end impl_opcode;
+
+   -- [Convertion W32 <-> Float]
+
+   procedure impl_opcode(ins : in out Inst_Word2Float) is
+   begin
+      ins.p2.all := FloatToW32(Float(ins.p1.all));
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_Round) is
+   begin
+      ins.p2.all := Word32(Float'Rounding(W32ToFloat(ins.p1.all)));
+   end impl_opcode;
+
+   -- [ControlFlow + Structural access instructions]
 
    procedure impl_opcode(ins : in out Inst_GetElem) is
    begin
