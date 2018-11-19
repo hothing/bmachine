@@ -64,7 +64,51 @@ package body bvmkf is
    end record;
    procedure impl_opcode(ins : in out Inst_Round);
 
+   -- [Bit instructions]
+
+   type Inst_AndBit is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+      x1, x2, x3 : BitAddress;
+   end record;
+   procedure impl_opcode(ins : in out Inst_AndBit);
+
+   type Inst_AndNotBit is new Inst_AndBit with null record;
+   procedure impl_opcode(ins : in out Inst_AndNotBit);
+
+   type Inst_OrBit is new Inst_AndBit with null record;
+   procedure impl_opcode(ins : in out Inst_OrBit);
+
+   type Inst_OrNotBit is new Inst_OrBit with null record;
+   procedure impl_opcode(ins : in out Inst_OrNotBit);
+
+   type Inst_XorBit is new Inst_AndBit with null record;
+   procedure impl_opcode(ins : in out Inst_XorBit);
+
+   -- [Comparision Integer]
+
+   type Inst_EqInt is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+      x3 : BitAddress;
+   end record;
+   procedure impl_opcode(ins : in out Inst_EqInt);
+
+   type Inst_NeqInt is new Inst_EqInt with null record;
+   procedure impl_opcode(ins : in out Inst_NeqInt);
+
+   type Inst_GtInt is new Inst_EqInt with null record;
+   procedure impl_opcode(ins : in out Inst_GtInt);
+
+   type Inst_GeInt is new Inst_EqInt with null record;
+   procedure impl_opcode(ins : in out Inst_GeInt);
+
+   type Inst_LtInt is new Inst_EqInt with null record;
+   procedure impl_opcode(ins : in out Inst_LtInt);
+
+   type Inst_LeInt is new Inst_EqInt with null record;
+   procedure impl_opcode(ins : in out Inst_LeInt);
+
    -- [ControlFlow + Structural access instructions]
+
    type Inst_GetElem is new Instruction with record
       local : PtrLocalData;
       base  : Address;
@@ -104,6 +148,8 @@ package body bvmkf is
    end record;
    procedure impl_opcode(ins : in out Inst_Return);
 
+   --------------------------------------------------
+
    procedure exec(ins : in out Instruction'Class) is
    begin
       impl_opcode(ins);
@@ -114,7 +160,7 @@ package body bvmkf is
       null;
    end impl_opcode;
 
-   --------------------------------------------------
+
 
    -- [Integer instructions]
 
@@ -175,6 +221,96 @@ package body bvmkf is
    procedure impl_opcode(ins : in out Inst_Round) is
    begin
       ins.p2.all := Word32(Float'Rounding(W32ToFloat(ins.p1.all)));
+   end impl_opcode;
+
+   -- [Bit instructions]
+   procedure impl_opcode(ins : in out Inst_AndBit) is
+      bx1, bx2 : W32Bits;
+   begin
+      bx1.w := ins.p1.all;
+      bx2.w := ins.p2.all;
+      bx1.x(ins.x3) := bx1.x(ins.x1) and bx2.x(ins.x2);
+      ins.p3.all := bx1.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_AndNotBit) is
+      bx1, bx2 : W32Bits;
+   begin
+      bx1.w := ins.p1.all;
+      bx2.w := ins.p2.all;
+      bx1.x(ins.x3) := bx1.x(ins.x1) and not bx2.x(ins.x2);
+      ins.p3.all := bx1.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_OrBit) is
+      bx1, bx2 : W32Bits;
+   begin
+      bx1.w := ins.p1.all;
+      bx2.w := ins.p2.all;
+      bx1.x(ins.x3) := bx1.x(ins.x1) or bx2.x(ins.x2);
+      ins.p3.all := bx1.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_OrNotBit) is
+      bx1, bx2 : W32Bits;
+   begin
+      bx1.w := ins.p1.all;
+      bx2.w := ins.p2.all;
+      bx1.x(ins.x3) := bx1.x(ins.x1) or not bx2.x(ins.x2);
+      ins.p3.all := bx1.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_XorBit) is
+      bx1, bx2 : W32Bits;
+   begin
+      bx1.w := ins.p1.all;
+      bx2.w := ins.p2.all;
+      bx1.x(ins.x3) := bx1.x(ins.x1) xor bx2.x(ins.x2);
+      ins.p3.all := bx1.w;
+   end impl_opcode;
+
+   -- [Comparision Integer]
+
+   procedure impl_opcode(ins : in out Inst_EqInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) = Integer(ins.p2.all));
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_NeqInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) /= Integer(ins.p2.all));
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_GtInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) > Integer(ins.p2.all));
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_GeInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) >= Integer(ins.p2.all));
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_LtInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) < Integer(ins.p2.all));
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_LeInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) <= Integer(ins.p2.all));
+      ins.p3.all := bx.w;
    end impl_opcode;
 
    -- [ControlFlow + Structural access instructions]
