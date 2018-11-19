@@ -8,6 +8,26 @@ package body bvmkf is
    end record;
    procedure impl_opcode(ins : in out Inst_AddInt);
 
+   type Inst_SubInt is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_SubInt);
+
+   type Inst_MulInt is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_MulInt);
+
+   type Inst_DivInt is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_DivInt);
+
+   type Inst_ModInt is new Instruction with record
+      p1, p2, p3 : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_ModInt);
+
    type Inst_GetElem is new Instruction with record
       local : PtrLocalData;
       base  : Address;
@@ -57,9 +77,31 @@ package body bvmkf is
       null;
    end impl_opcode;
 
+   --------------------------------------------------
+
    procedure impl_opcode(ins : in out Inst_AddInt) is
    begin
       ins.p3.all := ins.p1.all + ins.p2.all;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_SubInt) is
+   begin
+      ins.p3.all := ins.p1.all - ins.p2.all;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_MulInt) is
+   begin
+      ins.p3.all := ins.p1.all * ins.p2.all;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_DivInt) is
+   begin
+      ins.p3.all := ins.p1.all / ins.p2.all;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_ModInt) is
+   begin
+      ins.p3.all := ins.p1.all mod ins.p2.all;
    end impl_opcode;
 
    procedure impl_opcode(ins : in out Inst_GetElem) is
