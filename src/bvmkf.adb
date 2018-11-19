@@ -107,6 +107,15 @@ package body bvmkf is
    type Inst_LeInt is new Inst_EqInt with null record;
    procedure impl_opcode(ins : in out Inst_LeInt);
 
+   type Inst_EqZeroInt is new Instruction with record
+      p1, p3 : PtrWord32;
+      x3 : BitAddress;
+   end record;
+   procedure impl_opcode(ins : in out Inst_EqZeroInt);
+
+   type Inst_NeqZeroInt is new Inst_EqZeroInt with null record;
+   procedure impl_opcode(ins : in out Inst_NeqZeroInt);
+
    -- [ControlFlow + Structural access instructions]
 
    type Inst_GetElem is new Instruction with record
@@ -131,6 +140,16 @@ package body bvmkf is
    end record;
    procedure impl_opcode(ins : in out Inst_Jump);
 
+   type Inst_JumpCondW is new Inst_Jump with record
+      p      : PtrWord32;
+   end record;
+   procedure impl_opcode(ins : in out Inst_JumpCondW);
+
+   type Inst_JumpCondB is new Inst_JumpCondW with record
+      x      : BitAddress;
+   end record;
+   procedure impl_opcode(ins : in out Inst_JumpCondB);
+
    type Inst_Call is new Instruction with record
       extFunc  : PtrMuFunction;
    end record;
@@ -150,6 +169,8 @@ package body bvmkf is
 
    --------------------------------------------------
 
+   -- [Common]
+
    procedure exec(ins : in out Instruction'Class) is
    begin
       impl_opcode(ins);
@@ -159,8 +180,6 @@ package body bvmkf is
    begin
       null;
    end impl_opcode;
-
-
 
    -- [Integer instructions]
 
@@ -313,6 +332,21 @@ package body bvmkf is
       ins.p3.all := bx.w;
    end impl_opcode;
 
+   procedure impl_opcode(ins : in out Inst_EqZeroInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) = 0);
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_NeqZeroInt) is
+      bx : W32Bits;
+   begin
+      bx.x(ins.x3) := Bit(Integer(ins.p1.all) /= 0);
+      ins.p3.all := bx.w;
+   end impl_opcode;
+
+
    -- [ControlFlow + Structural access instructions]
 
    procedure impl_opcode(ins : in out Inst_GetElem) is
@@ -330,6 +364,22 @@ package body bvmkf is
    procedure impl_opcode(ins : in out Inst_Jump) is
    begin
       ins.func.PC := ins.func.PC + ins.offset;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_JumpCondW) is
+   begin
+      if ins.p.all /= 0 then
+         ins.func.PC := ins.func.PC + ins.offset;
+      end if;
+   end impl_opcode;
+
+   procedure impl_opcode(ins : in out Inst_JumpCondB) is
+      wx : W32Bits;
+   begin
+      wx.w := ins.p.all;
+      if wx.x(ins.x) then
+         ins.func.PC := ins.func.PC + ins.offset;
+      end if;
    end impl_opcode;
 
    procedure impl_opcode(ins : in out Inst_Call) is
