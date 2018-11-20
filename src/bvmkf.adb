@@ -114,11 +114,11 @@ package body bvmkf is
 
       pf2.frame.upLink := pf.frame'Access;
 
-      pf.frame.sData.m(0) := 0;
+      pf.frame.sData.m(0) := 1;
       pf.frame.sData.m(1) := 1;
-      pf.frame.sData.m(2) := 0;
-      pf.frame.sData.m(3) := 0;
-      pf.frame.sData.m(4) := 0;
+      pf.frame.sData.m(2) := 1;
+      pf.frame.sData.m(3) := 1;
+      pf.frame.sData.m(4) := 1;
 
 
 
@@ -204,9 +204,39 @@ package body bvmkf is
                                             x3 => 2
                                            );
 
+      n := n + 1;
+      pf.code(n) := new InstructBit.RSTrigger'(p1 => pf.frame.sData.m(0)'Access,
+                                            p2 => pf.frame.sData.m(1)'Access,
+                                            p3 => pf.frame.sData.m(0)'Access,
+                                            x1 => 0,
+                                            x2 => 1,
+                                            x3 => 2
+                                           );
+
+      n := n + 1;
+      pf.code(n) := new InstructBit.SRTrigger'(p1 => pf.frame.sData.m(0)'Access,
+                                            p2 => pf.frame.sData.m(1)'Access,
+                                            p3 => pf.frame.sData.m(0)'Access,
+                                            x1 => 0,
+                                            x2 => 1,
+                                            x3 => 2
+                                           );
+
+      n := n + 1;
+      pf.code(n) := new InstructBit.SetBit'(p1 => pf.frame.sData.m(0)'Access,
+                                            x1 => 0);
+
+      n := n + 1;
+      pf.code(n) := new InstructBit.ReSetBit'(p1 => pf.frame.sData.m(0)'Access,
+                                            x1 => 0);
+
+      n := n + 1;
+      pf.code(n) := new InstructBit.InvertBit'(p1 => pf.frame.sData.m(0)'Access,
+                                            x1 => 0);
+
       ----------------------------------
 
-      M := testInstructions / Integer(N);
+      M := testInstructions / Integer(n);
       tb := Ada.Real_Time.Clock;
       for i in 1 .. M loop
          --exec(pi.all);
