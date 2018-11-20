@@ -43,9 +43,12 @@ package body bvmks is
 
    procedure impl_opcode(ins : in out Inst_AddInt) is
    begin
-      ins.p3.frame.all.sData.m(ins.p3.offset) :=
-        ins.p1.frame.all.sData.m(ins.p1.offset)
-        + ins.p2.frame.all.sData.m(ins.p2.offset);
+      ins.p3.frame.all.sData(ins.p3.offset).w :=
+        IntToW32(
+                 W32ToInt(ins.p1.frame.all.sData(ins.p1.offset).w)
+                 +
+                   W32ToInt(ins.p2.frame.all.sData(ins.p2.offset).w)
+                );
    end impl_opcode;
 
    procedure impl_opcode(ins : in out Inst_Jump) is
@@ -66,8 +69,8 @@ package body bvmks is
       -- I void to check the extFunc and paramID because
       -- this can be done in a binding stage
       -- ASSERT(ins.id < ins.extFunc.frame.N)
-      ins.extFunc.frame.sData.m(ins.id) :=
-        ins.arg.frame.all.sData.m(ins.arg.offset);
+      ins.extFunc.frame.sData(ins.id) :=
+        ins.arg.frame.all.sData(ins.arg.offset);
    end impl_opcode;
 
 
@@ -84,7 +87,11 @@ package body bvmks is
       for i in self.code'Range loop
          pi := self.code(i);
          -- ASSERT(pi /= null) - can be checked in a binding stage
-         exec(pi.all);
+         if pi /= null then
+            exec(pi.all);
+         else
+            exit;
+         end if;
          if self.res /= FcExec then
             exit;
          end if;
@@ -100,6 +107,8 @@ package body bvmks is
    -- DoTest --
    ------------
 
+   testInstructions : constant Integer := 100_000_000;
+
    procedure DoTest1 is
       vd1, vd2 : Word32;
       tb, te : Ada.Real_Time.Time;
@@ -107,7 +116,7 @@ package body bvmks is
       tb := Ada.Real_Time.Clock;
       vd1 := 0;
       vd2 := 1;
-      for i in 1 .. 100_000_000 loop
+      for i in 1 .. testInstructions loop
          vd2 := Word32(i mod 2);
          vd1 := vd1 + vd2;
       end loop;
@@ -117,37 +126,44 @@ package body bvmks is
    end DoTest1;
 
    procedure DoTest2 is
-      pcp  : PtrMemSegment;
       pm   : PtrModule;
-      pi   : PtrInstruction;
-      --pf, pf2   : PtrMuFunction;
-
+      pf   : PtrMuFunction;
+      m : Integer;
+      n : Word32;
       tb, te : Ada.Real_Time.Time;
    begin
-      pcp := new MemorySegment(1023);
-      pcp.all.m(0) := 0;
-      pcp.all.m(1) := 1;
-
       pm  := new Module(1023, 4, 4);
-      pm.cp := pcp;
 
-      pm.data.sData.m(0) := 0;
-      pm.data.sData.m(1) := 1;
-      pi := new Inst_AddInt'(p1 => Reference'( frame => pm.data'Access,
+      pm.data.sData(0).w := 0;
+      pm.data.sData(1).w := 1;
+
+      pf  := new MuFunction(16);
+      pf.frame := new LocalData(16, 0, False);
+      pf.frame.upLink := pm.data'Access;
+
+      for i in pf.frame.all.sData'Range loop
+         pf.frame.all.sData(i).w := 0;
+      end loop;
+
+      n := 0;
+      pf.code(n) := new Inst_AddInt'(p1 => Reference'( frame => pf.frame,
                                                offset => 0, size => 1),
-                             p2 => Reference'( frame => pm.data'Access,
+                             p2 => Reference'( frame => pf.frame,
                                                offset => 1, size => 1),
                              p3 => Reference'( frame => pm.data'Access,
                                                offset => 0, size => 1));
 
-
+      M := testInstructions / Integer(n + 1);
       tb := Ada.Real_Time.Clock;
-      for i in 1 .. 100_000_000 loop
-         exec(pi.all);
+      for i in 1 .. M loop
+         call(pf.all);
       end loop;
       te := Ada.Real_Time.Clock;
+
+      Put("Duration: ");
       Put_Line(Duration'Image(To_Duration(te - tb)));
-      Put_Line(Word32'Image(pm.data.sData.m(0)));
+      Put("Result: ");
+      Put_Line(Word32'Image(pm.data.sData(0).w));
    end DoTest2;
 
    procedure DoTest is

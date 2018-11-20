@@ -3,6 +3,7 @@ with Ada.Real_Time; use Ada.Real_Time;
 
 with bvmks;
 with bvmkf;
+with bvmkp;
 
 procedure Main is
 
@@ -11,6 +12,8 @@ begin
    bvmks.DoTest;
    Put_Line("VM-KF");
    bvmkf.DoTest;
+   Put_Line("VM-KP");
+   bvmkp.DoTest;
 end Main;
 
 -- elapsed time: 00.75s (mode:default; 1e7 instr)

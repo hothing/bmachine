@@ -1,7 +1,7 @@
 with Interfaces; use Interfaces;
 with Ada.Unchecked_Conversion;
 
-package bvmks is
+package bvmkp is
 
    type DataFormat is (B8, W8, W16, W32, W64, W80);
    
@@ -19,6 +19,7 @@ package bvmks is
    for Bit'Size use 1;
    
    subtype BitAddress is Byte range 0 .. 31;
+   
    type BitField is array(BitAddress) of Bit;
    for BitField'Size use Word32'Size;
    pragma Pack (BitField);
@@ -33,10 +34,6 @@ package bvmks is
    pragma Pack(W32Value);
    
    type MemoryBlock is array (Address range <>) of aliased W32Value;
-   type MemorySegment(s: Address) is record
-      m : MemoryBlock(Address'First .. s);
-   end record;   
-   type PtrMemSegment is access all MemorySegment;
    
    type PtrBool is access all Bool;
    type PtrWord32 is access all Word32;
@@ -60,37 +57,44 @@ package bvmks is
       end case;      
    end record;
    
-   type Reference(offset  : Address := 0; size : Address := 1) is record
-      frame  : PtrLocalData;      
+   type PhiFunction;
+   type PtrPhiFunction is access PhiFunction;
+   
+   type PhiCode(b : Boolean := False) is record
+      code : Byte;
+      case b is
+         when false =>
+            reg1 : Byte;
+            reg2 : Byte;
+            reg3 : Byte;
+         when true =>
+            regb : Byte;
+            bita : BitAddress;
+      end case;
    end record;
-   type PtrReference is access all Reference;
+   pragma Unchecked_Union(PhiCode);
+   for PhiCode'Size use Word32'Size;
    
-   type Instruction is tagged null record;
-   type PtrInstruction is access Instruction'Class;
+   type PhiResult is (FcExec, FcExit, FcFailure);
+   type PhiCodeLine is array(Address range <>) of PhiCode;
    
-   procedure exec(ins : in out Instruction'Class);
-   procedure impl_opcode(ins : in out Instruction);
-   
-   type FunctionResult is (FcExec, FcExit, FcFailure);
-   type MuCodeLine is array(Address range <>) of PtrInstruction;
-   
-   type MuFunction(cs : Address) is record
-      frame  : PtrLocalData; -- reference to the parameters and static data                                                                                              
-      code   : MuCodeLine(Address'First .. cs); -- mu-code
+   type PhiFunction(cs : Address) is record
+      frame  : PtrLocalData; -- reference to the parameters and static data
+                             -- I use the reference because of hot-programm change
+                             -- Of course, it's not solid
+      code   : PhiCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
-      res    : FunctionResult;
+      res    : PhiResult;
    end record;
-   type PtrMuFunction is access MuFunction;
-   
-   procedure call (self : in out MuFunction);
-   function execCode (self :  in out MuFunction) return FunctionResult;
-   
+      
+   procedure call (self : in out PhiFunction);
+
    subtype ModArrIndex is Address range 0 .. 64;   
    type ModuleRefArray is array (ModArrIndex) of RefModule;
    type PtrModRefArray is access ModuleRefArray;
    
    subtype FuncArrIndex is Address range 0 .. 64;
-   type FuncArray is array (FuncArrIndex) of PtrMuFunction;   
+   type FuncArray is array (FuncArrIndex) of PtrPhiFunction;   
    type FuncMap is array(FuncArrIndex range <>) of FuncArrIndex;
    
    type AddrArray is array (Address range <>) of Address;
@@ -110,7 +114,6 @@ package bvmks is
       data   : aliased LocalData(ds, ds, True);
       mLink  : ModuleRefArray;
       func   : FuncArray;
-      cp     : PtrMemSegment; -- pointer to a global constants segment  
    end record;
       
    function IntToW32 is new
@@ -132,5 +135,6 @@ package bvmks is
      Ada.Unchecked_Conversion(Word32, VariableAddress);
       
    procedure DoTest;
-   
-end bvmks;
+ 
+
+end bvmkp;
