@@ -60,18 +60,25 @@ package bvmkp is
    type PhiFunction;
    type PtrPhiFunction is access PhiFunction;
    
-   type PhiCode(b : Boolean := False) is record
+   type PhiCodeFormat is (PCF_REG3, PCF_STACK, PCF_BITS);
+   for PhiCodeFormat'Size use 4;
+   
+   type PhiCode(b : PhiCodeFormat := PCF_REG3) is record
       code : Byte;
       case b is
-         when false =>
+         when PCF_REG3 =>
             reg1 : Byte;
             reg2 : Byte;
             reg3 : Byte;
-         when true =>
+         when PCF_STACK =>
+            --sel  : Byte;
+            sel  : Word16;
+         when PCF_BITS =>
             regb : Byte;
-            bita : BitAddress;
+            --bita : BitAddress;
       end case;
    end record;
+   pragma Pack(PhiCode);
    pragma Unchecked_Union(PhiCode);
    for PhiCode'Size use Word32'Size;
    
@@ -86,7 +93,7 @@ package bvmkp is
       PC     : Address; -- program counter / instruction pointer
       res    : PhiResult;
       -- FOR TEST PURPOUSE
-      accu   : MemoryBlock(0 .. 6);
+      accu   : MemoryBlock(1 .. 7);
       atop   : Address;
    end record;
       

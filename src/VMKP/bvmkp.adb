@@ -9,60 +9,148 @@ package body bvmkp is
 
    procedure call (self : in out PhiFunction) is
       c : PhiCode;
+      s : PtrLocalData;
+
+      procedure Dup is
+      begin
+         if self.atop < self.accu'Last and self.atop >= self.accu'First then
+            self.atop := self.atop + 1;
+            self.accu(self.atop).w := self.accu(self.atop - 1).w;
+         end if;
+      end Dup;
+
+      procedure Drop is
+      begin
+         if self.atop >= self.accu'First then
+            self.accu(self.atop).w := 0;
+            self.atop := self.atop - 1;
+         end if;
+      end Drop;
+
+      procedure PushZero is
+      begin
+         if self.atop < self.accu'Last then
+            self.atop := self.atop + 1;
+            self.accu(self.atop).w := 0;
+         end if;
+      end PushZero;
+
+      procedure PushOne is
+      begin
+         if self.atop < self.accu'Last then
+            self.atop := self.atop + 1;
+            self.accu(self.atop).w := 1;
+         end if;
+      end PushOne;
+
+      procedure PushShortInt is
+      begin
+         if self.atop < self.accu'Last then
+            self.atop := self.atop + 1;
+            self.accu(self.atop).w := Word32(c.sel);
+         end if;
+      end PushShortInt;
+
+      procedure IncInt is
+      begin
+         self.accu(self.atop).w :=
+           IntToW32(W32ToInt(self.accu(self.atop).w) + 1);
+      end IncInt;
+
+      procedure DecInt is
+      begin
+         self.accu(self.atop).w :=
+           IntToW32(W32ToInt(self.accu(self.atop).w) - 1);
+      end DecInt;
+
+      procedure UseLocal is
+      begin
+         s := self.frame;
+      end UseLocal;
+
+      procedure UseUplevel( lev : Byte ) is
+      begin
+         s := self.frame;
+         for i in lev .. 0 loop
+            if s /= null then
+               s := s.upLink;
+            end if;
+         end loop;
+         if s = null then
+            -- TODO : reaction
+            null;
+         end if;
+      end UseUplevel;
+
+      procedure Load is
+      begin
+         if self.atop < self.accu'Last then
+            self.atop := self.atop + 1;
+            self.accu(self.atop).w := s.sData(Word32(c.sel)).w;
+         end if;
+      end Load;
+
+      procedure Store is
+      begin
+         if self.atop in self.accu'Range then
+            --self.atop := self.atop + 1;
+            s.sData(Word32(c.sel)).w := self.accu(self.atop).w;
+         end if;
+      end Store;
+
+      -- 3Reg integer operations
+      procedure R3_AddInt is
+      begin
+         s.sData(Word32(c.reg3)).w :=
+              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
+                       +
+                         W32ToInt(s.sData(Word32(c.reg2)).w));
+      end R3_AddInt;
+
+      procedure R3_SubInt is
+      begin
+         s.sData(Word32(c.reg3)).w :=
+              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
+                       -
+                         W32ToInt(s.sData(Word32(c.reg2)).w));
+      end R3_SubInt;
+
+      procedure R3_MulInt is
+      begin
+         s.sData(Word32(c.reg3)).w :=
+              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
+                       *
+                         W32ToInt(s.sData(Word32(c.reg2)).w));
+      end R3_MulInt;
+
+      procedure R3_DivInt is
+      begin
+         s.sData(Word32(c.reg3)).w :=
+              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
+                       /
+                         W32ToInt(s.sData(Word32(c.reg2)).w));
+      end R3_DivInt;
+
    begin
+      UseLocal;
+      self.PC := self.code'First;
       while self.PC in self.code'Range loop
          c := self.code(self.PC);
          case c.code is
          when 16#00# => null;
          when 16#01# =>
-            self.frame.sData(Word32(c.reg3)).w :=
-              self.frame.sData(Word32(c.reg1)).w;
-         when 16#02# =>
-            self.frame.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
-                       +
-                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
-         when 16#03# =>
-            self.frame.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
-                       -
-                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
-         when 16#04# =>
-            self.frame.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
-                       *
-                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
-         when 16#05# =>
-            self.frame.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
-                       /
-                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
-            when 16#07# =>
-               if self.atop >= 1 then
-                  self.accu(self.atop - 1).w :=
-                    IntToW32(
-                             W32ToInt(self.accu(self.atop - 1).w)
-                             +
-                               W32ToInt(self.accu(self.atop).w)
-                            );
-                  self.atop := self.atop - 1;
-               else
-                  -- TODO: reaction
-                  null;
-               end if;
-            when 16#08# =>
-               if self.atop < self.accu'Last then
-                  self.atop := self.atop + 1;
-                  self.accu(self.atop - 1).w := 1;
-               end if;
+            s.sData(Word32(c.reg3)).w := s.sData(Word32(c.reg1)).w;
 
-            when 16#10# =>
+         when 16#02# => R3_AddInt;
+         when 16#03# => R3_SubInt;
+         when 16#04# => R3_MulInt;
+         when 16#05# => R3_DivInt;
+         when 16#F0# =>
                declare
                   old_pc : Address;
                begin
                   old_pc := self.PC;
-                  self.PC := self.PC + (self.frame.sData(Word32(c.reg1)).w +
-                                          self.frame.sData(Word32(c.reg2)).w * 255);
+                  self.PC := self.PC + Address(c.sel);
                   if not (self.PC in self.code'Range) then
                      self.PC := old_pc;
                      exit;
@@ -118,7 +206,7 @@ package body bvmkp is
       Put("Duration: ");
       Put_Line(Duration'Image(To_Duration(te - tb)));
       Put("Result: ");
-      Put_Line(Word32'Image(pf.accu(0).w));
+      Put_Line(Word32'Image(pf.accu(1).w));
 
    end DoTest;
 
