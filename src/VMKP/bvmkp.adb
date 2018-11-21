@@ -21,35 +21,54 @@ package body bvmkp is
             self.frame.sData(Word32(c.reg3)).w :=
               IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
                        +
-                       W32ToInt(self.frame.sData(Word32(c.reg2)).w));
+                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
          when 16#03# =>
             self.frame.sData(Word32(c.reg3)).w :=
               IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
                        -
-                       W32ToInt(self.frame.sData(Word32(c.reg2)).w));
+                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
          when 16#04# =>
             self.frame.sData(Word32(c.reg3)).w :=
               IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
                        *
-                       W32ToInt(self.frame.sData(Word32(c.reg2)).w));
+                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
          when 16#05# =>
             self.frame.sData(Word32(c.reg3)).w :=
               IntToW32(W32ToInt(self.frame.sData(Word32(c.reg1)).w)
                        /
-                       W32ToInt(self.frame.sData(Word32(c.reg2)).w));
-         when 16#10# =>
-            declare
-               old_pc : Address;
-            begin
-               old_pc := self.PC;
-               self.PC := self.PC + (self.frame.sData(Word32(c.reg1)).w +
-                                    self.frame.sData(Word32(c.reg2)).w * 255);
-               if not (self.PC in self.code'Range) then
-                  self.PC := old_pc;
-                  exit;
+                         W32ToInt(self.frame.sData(Word32(c.reg2)).w));
+            when 16#07# =>
+               if self.atop >= 1 then
+                  self.accu(self.atop - 1).w :=
+                    IntToW32(
+                             W32ToInt(self.accu(self.atop - 1).w)
+                             +
+                               W32ToInt(self.accu(self.atop).w)
+                            );
+                  self.atop := self.atop - 1;
+               else
+                  -- TODO: reaction
+                  null;
                end if;
-            end;
-         when others => null;
+            when 16#08# =>
+               if self.atop < self.accu'Last then
+                  self.atop := self.atop + 1;
+                  self.accu(self.atop - 1).w := 1;
+               end if;
+
+            when 16#10# =>
+               declare
+                  old_pc : Address;
+               begin
+                  old_pc := self.PC;
+                  self.PC := self.PC + (self.frame.sData(Word32(c.reg1)).w +
+                                          self.frame.sData(Word32(c.reg2)).w * 255);
+                  if not (self.PC in self.code'Range) then
+                     self.PC := old_pc;
+                     exit;
+                  end if;
+               end;
+            when others => null;
          end case;
 
          self.PC := self.PC + 1;
@@ -73,10 +92,19 @@ package body bvmkp is
       pf.frame.sData(1).w := 0;
 
       for i in pf.code'Range loop
-         pf.code(i).code := 16#02#;
-         pf.code(i).reg1 := 1;
-         pf.code(i).reg2 := 0;
-         pf.code(i).reg3 := 0;
+         case i mod 3 is
+            when 0 =>
+               pf.code(i).code := 16#02#;
+               pf.code(i).reg1 := 1;
+               pf.code(i).reg2 := 0;
+               pf.code(i).reg3 := 0;
+            when 1 =>
+               pf.code(i).code := 16#08#; -- PUSH 1
+            when 2 =>
+               pf.code(i).code := 16#07#; -- ADDI
+            when others =>
+               null;
+         end case;
       end loop;
       pf.PC := pf.code'First;
 
@@ -90,7 +118,7 @@ package body bvmkp is
       Put("Duration: ");
       Put_Line(Duration'Image(To_Duration(te - tb)));
       Put("Result: ");
-      Put_Line(Word32'Image(pf.frame.sData(0).w));
+      Put_Line(Word32'Image(pf.accu(0).w));
 
    end DoTest;
 

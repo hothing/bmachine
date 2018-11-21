@@ -85,6 +85,9 @@ package bvmkp is
       code   : PhiCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
       res    : PhiResult;
+      -- FOR TEST PURPOUSE
+      accu   : MemoryBlock(0 .. 6);
+      atop   : Address;
    end record;
       
    procedure call (self : in out PhiFunction);
