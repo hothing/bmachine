@@ -10,6 +10,9 @@ package body bvmkp is
    procedure call (self : in out PhiFunction) is
       c : PhiCode;
       s : PtrLocalData;
+      rca, rcb : Boolean;
+
+      -- Instructions
 
       procedure Dup is
       begin
@@ -63,6 +66,78 @@ package body bvmkp is
            IntToW32(W32ToInt(self.accu(self.atop).w) - 1);
       end DecInt;
 
+      procedure AddInt is
+      begin
+         if self.atop > self.accu'First then
+            self.accu(self.atop - 1).w :=
+              IntToW32(
+                       W32ToInt(self.accu(self.atop).w)
+                       +
+                         W32ToInt(self.accu(self.atop - 1).w)
+                      );
+            self.atop := self.atop - 1;
+         end if;
+      end AddInt;
+
+      procedure SubInt is
+      begin
+         if self.atop > self.accu'First then
+            self.accu(self.atop - 1).w :=
+              IntToW32(
+                       W32ToInt(self.accu(self.atop).w)
+                       -
+                         W32ToInt(self.accu(self.atop - 1).w)
+                      );
+            self.atop := self.atop - 1;
+         end if;
+      end SubInt;
+
+      procedure MulInt is
+      begin
+         if self.atop > self.accu'First then
+            self.accu(self.atop - 1).w :=
+              IntToW32(
+                       W32ToInt(self.accu(self.atop).w)
+                       *
+                         W32ToInt(self.accu(self.atop - 1).w)
+                      );
+            self.atop := self.atop - 1;
+         end if;
+      end MulInt;
+
+      procedure DivInt is
+      begin
+         if self.atop > self.accu'First then
+            if W32ToInt(self.accu(self.atop).w) /= 0 then
+               self.accu(self.atop - 1).w :=
+                 IntToW32(
+                          W32ToInt(self.accu(self.atop - 1).w)
+                          /
+                            W32ToInt(self.accu(self.atop).w)
+                         );
+               self.atop := self.atop - 1;
+            else
+               -- TODO : reaction
+               rcb := false;
+            end if;
+         end if;
+      end DivInt;
+
+      procedure ModUInt is
+      begin
+         if self.atop > self.accu'First then
+            if self.accu(self.atop).w /= 0 then
+               self.accu(self.atop - 1).w :=
+                 self.accu(self.atop - 1).w
+                          mod self.accu(self.atop).w;
+               self.atop := self.atop - 1;
+            else
+               -- TODO : reaction
+               rcb := false;
+            end if;
+         end if;
+      end ModUInt;
+
       procedure UseLocal is
       begin
          s := self.frame;
@@ -78,7 +153,7 @@ package body bvmkp is
          end loop;
          if s = null then
             -- TODO : reaction
-            null;
+            rcb := false;
          end if;
       end UseUplevel;
 
@@ -131,35 +206,57 @@ package body bvmkp is
                          W32ToInt(s.sData(Word32(c.reg2)).w));
       end R3_DivInt;
 
+      procedure R3_Copy is
+      begin
+         s.sData(Word32(c.reg3)).w := s.sData(Word32(c.reg1)).w;
+      end R3_Copy;
+
+      -- Flow control
+
+      procedure JumpUncond is
+         old_pc : Address;
+      begin
+         old_pc := self.PC;
+         self.PC := self.PC + Address(c.sel);
+         if not (self.PC in self.code'Range) then
+            self.PC := old_pc;
+            rcb := false;
+         end if;
+      end JumpUncond;
+
    begin
       UseLocal;
       self.PC := self.code'First;
-      while self.PC in self.code'Range loop
+      rcb := true;
+      rca := self.PC in self.code'Range;
+      while rca and rcb loop
          c := self.code(self.PC);
          case c.code is
          when 16#00# => null;
-         when 16#01# =>
-            s.sData(Word32(c.reg3)).w := s.sData(Word32(c.reg1)).w;
-
+         when 16#01# => R3_Copy;
          when 16#02# => R3_AddInt;
          when 16#03# => R3_SubInt;
          when 16#04# => R3_MulInt;
          when 16#05# => R3_DivInt;
-         when 16#F0# =>
-               declare
-                  old_pc : Address;
-               begin
-                  old_pc := self.PC;
-                  self.PC := self.PC + Address(c.sel);
-                  if not (self.PC in self.code'Range) then
-                     self.PC := old_pc;
-                     exit;
-                  end if;
-               end;
-            when others => null;
+         when 16#10# => UseLocal;
+         when 16#11# => UseUplevel(c.reg1);
+         when 16#12# => Load;
+         when 16#13# => Store;
+         when 16#14# => PushZero;
+         when 16#15# => PushOne;
+         when 16#16# => PushShortInt;
+         when 16#17# => Dup;
+         when 16#18# => Drop;
+         when 16#22# => AddInt;
+         when 16#23# => SubInt;
+         when 16#24# => MulInt;
+         when 16#25# => DivInt;
+         when 16#26# => ModUInt;
+         when 16#F0# => JumpUncond;
+         when others => null;
          end case;
-
          self.PC := self.PC + 1;
+         rca := self.PC in self.code'Range;
       end loop;
    end call;
 
@@ -182,14 +279,11 @@ package body bvmkp is
       for i in pf.code'Range loop
          case i mod 3 is
             when 0 =>
-               pf.code(i).code := 16#02#;
-               pf.code(i).reg1 := 1;
-               pf.code(i).reg2 := 0;
-               pf.code(i).reg3 := 0;
+               pf.code(i).code := 16#22#; -- ADDI
             when 1 =>
-               pf.code(i).code := 16#08#; -- PUSH 1
+               pf.code(i).code := 16#15#; -- PUSH 1
             when 2 =>
-               pf.code(i).code := 16#07#; -- ADDI
+               pf.code(i).code := 16#14#; -- PUSH 0
             when others =>
                null;
          end case;

@@ -92,7 +92,7 @@ package bvmkp is
       code   : PhiCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
       res    : PhiResult;
-      -- FOR TEST PURPOUSE
+      -- FOR TEST PURPOUSE : Ariphmetic stack
       accu   : MemoryBlock(1 .. 7);
       atop   : Address;
    end record;
