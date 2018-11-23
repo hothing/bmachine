@@ -60,6 +60,10 @@ package bvmkp is
    type PhiFunction;
    type PtrPhiFunction is access PhiFunction;
    
+   subtype FuncArrIndex is Address range 0 .. 64;
+   type FuncArray is array (FuncArrIndex) of PtrPhiFunction;   
+   type FuncMap is array(FuncArrIndex range <>) of FuncArrIndex;
+   
    type PhiCodeFormat is (PCF_REG3, PCF_STACK, PCF_BITS);
    for PhiCodeFormat'Size use 4;
    
@@ -91,18 +95,17 @@ package bvmkp is
                              -- Of course, it's not solid
       code   : PhiCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
-      res    : PhiResult;      
-   end record;
+      res    : PhiResult;
       
-   procedure call (self : in out PhiFunction);
+      subfc  : FuncArray;
+   end record;     
+   
 
    subtype ModArrIndex is Address range 0 .. 64;   
    type ModuleRefArray is array (ModArrIndex) of RefModule;
    type PtrModRefArray is access ModuleRefArray;
    
-   subtype FuncArrIndex is Address range 0 .. 64;
-   type FuncArray is array (FuncArrIndex) of PtrPhiFunction;   
-   type FuncMap is array(FuncArrIndex range <>) of FuncArrIndex;
+   
    
    type AddrArray is array (Address range <>) of Address;
    
@@ -123,6 +126,8 @@ package bvmkp is
       func   : FuncArray;
    end record;
       
+   procedure call (func : PtrPhiFunction; fumod : PtrModule);
+   
    function IntToW32 is new
      Ada.Unchecked_Conversion(Integer, Word32);
 

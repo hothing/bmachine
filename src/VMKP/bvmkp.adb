@@ -7,7 +7,8 @@ package body bvmkp is
    -- call --
    ----------
 
-   procedure call (self : in out PhiFunction) is
+   procedure call (func : PtrPhiFunction; fumod : PtrModule) is
+      f : PtrPhiFunction;
       c : PhiCode;
       s : PtrLocalData;
       rca, rcb : Boolean;
@@ -157,12 +158,12 @@ package body bvmkp is
 
       procedure UseLocal is
       begin
-         s := self.frame;
+         s := f.frame;
       end UseLocal;
 
       procedure UseUplevel( lev : Byte ) is
       begin
-         s := self.frame;
+         s := f.frame;
          for i in lev .. 0 loop
             if s /= null then
                s := s.upLink;
@@ -232,50 +233,80 @@ package body bvmkp is
       procedure JumpUncond is
          old_pc : Address;
       begin
-         old_pc := self.PC;
-         self.PC := self.PC + Address(c.sel);
-         if not (self.PC in self.code'Range) then
-            self.PC := old_pc;
+         old_pc := f.PC;
+         f.PC := f.PC + Address(c.sel);
+         if not (f.PC in f.code'Range) then
+            f.PC := old_pc;
             rcb := false;
          end if;
       end JumpUncond;
 
+      procedure CallModuleFc is
+         fn : PtrPhiFunction;
+      begin
+         rcb := false;
+         if Address(c.reg1) in f.subfc'Range then
+            fn := fumod.func(Address(c.reg1));
+            if fn /= null then
+               call(fn, fumod);
+               rcb := true;
+            end if;
+         end if;
+      end CallModuleFc;
+
+      procedure CallLocalFc is
+         fn : PtrPhiFunction;
+      begin
+         rcb := false;
+         if Address(c.reg1) in f.subfc'Range then
+            fn := f.subfc(Address(c.reg1));
+            fn.frame.upLink := func.frame;
+            if fn /= null then
+               call(fn, fumod);
+               rcb := true;
+            end if;
+         end if;
+      end CallLocalFc;
+
    begin
-      UseLocal;
-      self.PC := self.code'First;
-      rcb := true;
-      rca := self.PC in self.code'Range;
-      while rca and rcb loop
-         c := self.code(self.PC);
-         case c.code is
-         when 16#00# => null;
-         when 16#01# => R3_Copy;
-         when 16#02# => R3_AddInt;
-         when 16#03# => R3_SubInt;
-         when 16#04# => R3_MulInt;
-         when 16#05# => R3_DivInt;
-         when 16#10# => UseLocal;
-         when 16#11# => UseUplevel(c.reg1);
-         when 16#12# => Load;
-         when 16#13# => Store;
-         when 16#14# => PushZero;
-         when 16#15# => PushOne;
-         when 16#16# => PushShortInt;
-         when 16#17# => Dup;
-         when 16#18# => Drop;
-         when 16#22# => AddInt;
-         when 16#23# => SubInt;
-         when 16#24# => MulInt;
-         when 16#25# => DivInt;
-         when 16#26# => ModUInt;
-         when 16#F0# => JumpUncond;
-         when others => null;
-         end case;
-         self.PC := self.PC + 1;
-         rca := self.PC in self.code'Range;
-      end loop;
-      if not rcb then
-         self.res := FcFailure;
+      f := func;
+      if f /= null then
+         UseLocal;
+         f.PC := f.code'First;
+         rcb := true;
+         rca := f.PC in f.code'Range;
+         while rca and rcb loop
+            c := f.code(f.PC);
+            case c.code is
+            when 16#00# => null;
+            when 16#01# => R3_Copy;
+            when 16#02# => R3_AddInt;
+            when 16#03# => R3_SubInt;
+            when 16#04# => R3_MulInt;
+            when 16#05# => R3_DivInt;
+            when 16#10# => UseLocal;
+            when 16#11# => UseUplevel(c.reg1);
+            when 16#12# => Load;
+            when 16#13# => Store;
+            when 16#14# => PushZero;
+            when 16#15# => PushOne;
+            when 16#16# => PushShortInt;
+            when 16#17# => Dup;
+            when 16#18# => Drop;
+            when 16#22# => AddInt;
+            when 16#23# => SubInt;
+            when 16#24# => MulInt;
+            when 16#25# => DivInt;
+            when 16#26# => ModUInt;
+            when 16#F0# => JumpUncond;
+            when others => null;
+            end case;
+            f.PC := f.PC + 1;
+            rca := f.PC in f.code'Range;
+         end loop;
+         if not rcb then
+            f.res := FcFailure;
+         end if;
       end if;
    end call;
 
@@ -289,11 +320,17 @@ package body bvmkp is
       tb, te : Ada.Real_Time.Time;
       m : Integer;
       pf : PtrPhiFunction;
+      pm : PtrModule;
    begin
+
+      pm := new Module(128, 1, 1);
+
       pf := new PhiFunction(8);
       pf.frame := new LocalData(128, 16, false);
       pf.frame.sData(0).w := 0;
       pf.frame.sData(1).w := 0;
+      pf.frame.upLink := pm.data'Access;
+      pm.func(0) := pf;
 
       declare
          i : Address;
@@ -322,7 +359,7 @@ package body bvmkp is
       M := testInstructions / Integer(pf.cs);
       tb := Ada.Real_Time.Clock;
       for i in 1 .. M loop
-         call(pf.all);
+         call(pf, pm);
       end loop;
       te := Ada.Real_Time.Clock;
 
