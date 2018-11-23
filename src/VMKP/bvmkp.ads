@@ -91,10 +91,7 @@ package bvmkp is
                              -- Of course, it's not solid
       code   : PhiCodeLine(Address'First .. cs); -- mu-code
       PC     : Address; -- program counter / instruction pointer
-      res    : PhiResult;
-      -- FOR TEST PURPOUSE : Ariphmetic stack
-      accu   : MemoryBlock(1 .. 7);
-      atop   : Address;
+      res    : PhiResult;      
    end record;
       
    procedure call (self : in out PhiFunction);

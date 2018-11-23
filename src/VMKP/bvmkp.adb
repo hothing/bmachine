@@ -11,111 +11,128 @@ package body bvmkp is
       c : PhiCode;
       s : PtrLocalData;
       rca, rcb : Boolean;
+      -- Ariphmetic stack
+      accu   : MemoryBlock(1 .. 7);
+      atop   : Address := 0;
 
       -- Instructions
 
       procedure Dup is
       begin
-         if self.atop < self.accu'Last and self.atop >= self.accu'First then
-            self.atop := self.atop + 1;
-            self.accu(self.atop).w := self.accu(self.atop - 1).w;
+         if atop < accu'Last and atop >= accu'First then
+            atop := atop + 1;
+            accu(atop).w := accu(atop - 1).w;
+         else
+            rcb := false;
          end if;
       end Dup;
 
       procedure Drop is
       begin
-         if self.atop >= self.accu'First then
-            self.accu(self.atop).w := 0;
-            self.atop := self.atop - 1;
+         if atop >= accu'First then
+            accu(atop).w := 0;
+            atop := atop - 1;
          end if;
       end Drop;
 
       procedure PushZero is
       begin
-         if self.atop < self.accu'Last then
-            self.atop := self.atop + 1;
-            self.accu(self.atop).w := 0;
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := 0;
+         else
+            rcb := false;
          end if;
       end PushZero;
 
       procedure PushOne is
       begin
-         if self.atop < self.accu'Last then
-            self.atop := self.atop + 1;
-            self.accu(self.atop).w := 1;
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := 1;
+         else
+            rcb := false;
          end if;
       end PushOne;
 
       procedure PushShortInt is
       begin
-         if self.atop < self.accu'Last then
-            self.atop := self.atop + 1;
-            self.accu(self.atop).w := Word32(c.sel);
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := Word32(c.sel);
+         else
+            rcb := false;
          end if;
       end PushShortInt;
 
       procedure IncInt is
       begin
-         self.accu(self.atop).w :=
-           IntToW32(W32ToInt(self.accu(self.atop).w) + 1);
+         accu(atop).w :=
+           IntToW32(W32ToInt(accu(atop).w) + 1);
       end IncInt;
 
       procedure DecInt is
       begin
-         self.accu(self.atop).w :=
-           IntToW32(W32ToInt(self.accu(self.atop).w) - 1);
+         accu(atop).w :=
+           IntToW32(W32ToInt(accu(atop).w) - 1);
       end DecInt;
 
       procedure AddInt is
       begin
-         if self.atop > self.accu'First then
-            self.accu(self.atop - 1).w :=
+         if atop > accu'First then
+            accu(atop - 1).w :=
               IntToW32(
-                       W32ToInt(self.accu(self.atop).w)
+                       W32ToInt(accu(atop).w)
                        +
-                         W32ToInt(self.accu(self.atop - 1).w)
+                         W32ToInt(accu(atop - 1).w)
                       );
-            self.atop := self.atop - 1;
+            atop := atop - 1;
+         else
+            rcb := false;
          end if;
       end AddInt;
 
       procedure SubInt is
       begin
-         if self.atop > self.accu'First then
-            self.accu(self.atop - 1).w :=
+         if atop > accu'First then
+            accu(atop - 1).w :=
               IntToW32(
-                       W32ToInt(self.accu(self.atop).w)
+                       W32ToInt(accu(atop).w)
                        -
-                         W32ToInt(self.accu(self.atop - 1).w)
+                         W32ToInt(accu(atop - 1).w)
                       );
-            self.atop := self.atop - 1;
+            atop := atop - 1;
+         else
+            rcb := false;
          end if;
       end SubInt;
 
       procedure MulInt is
       begin
-         if self.atop > self.accu'First then
-            self.accu(self.atop - 1).w :=
+         if atop > accu'First then
+            accu(atop - 1).w :=
               IntToW32(
-                       W32ToInt(self.accu(self.atop).w)
+                       W32ToInt(accu(atop).w)
                        *
-                         W32ToInt(self.accu(self.atop - 1).w)
+                         W32ToInt(accu(atop - 1).w)
                       );
-            self.atop := self.atop - 1;
+            atop := atop - 1;
+         else
+            rcb := false;
          end if;
       end MulInt;
 
       procedure DivInt is
       begin
-         if self.atop > self.accu'First then
-            if W32ToInt(self.accu(self.atop).w) /= 0 then
-               self.accu(self.atop - 1).w :=
+         if atop > accu'First then
+            if W32ToInt(accu(atop).w) /= 0 then
+               accu(atop - 1).w :=
                  IntToW32(
-                          W32ToInt(self.accu(self.atop - 1).w)
+                          W32ToInt(accu(atop - 1).w)
                           /
-                            W32ToInt(self.accu(self.atop).w)
+                            W32ToInt(accu(atop).w)
                          );
-               self.atop := self.atop - 1;
+               atop := atop - 1;
             else
                -- TODO : reaction
                rcb := false;
@@ -125,12 +142,12 @@ package body bvmkp is
 
       procedure ModUInt is
       begin
-         if self.atop > self.accu'First then
-            if self.accu(self.atop).w /= 0 then
-               self.accu(self.atop - 1).w :=
-                 self.accu(self.atop - 1).w
-                          mod self.accu(self.atop).w;
-               self.atop := self.atop - 1;
+         if atop > accu'First then
+            if accu(atop).w /= 0 then
+               accu(atop - 1).w :=
+                 accu(atop - 1).w
+                          mod accu(atop).w;
+               atop := atop - 1;
             else
                -- TODO : reaction
                rcb := false;
@@ -159,17 +176,16 @@ package body bvmkp is
 
       procedure Load is
       begin
-         if self.atop < self.accu'Last then
-            self.atop := self.atop + 1;
-            self.accu(self.atop).w := s.sData(Word32(c.sel)).w;
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := s.sData(Word32(c.sel)).w;
          end if;
       end Load;
 
       procedure Store is
       begin
-         if self.atop in self.accu'Range then
-            --self.atop := self.atop + 1;
-            s.sData(Word32(c.sel)).w := self.accu(self.atop).w;
+         if atop in accu'Range then
+            s.sData(Word32(c.sel)).w := accu(atop).w;
          end if;
       end Store;
 
@@ -258,6 +274,9 @@ package body bvmkp is
          self.PC := self.PC + 1;
          rca := self.PC in self.code'Range;
       end loop;
+      if not rcb then
+         self.res := FcFailure;
+      end if;
    end call;
 
    ------------
@@ -276,19 +295,29 @@ package body bvmkp is
       pf.frame.sData(0).w := 0;
       pf.frame.sData(1).w := 0;
 
-      for i in pf.code'Range loop
-         case i mod 3 is
-            when 0 =>
-               pf.code(i).code := 16#22#; -- ADDI
-            when 1 =>
-               pf.code(i).code := 16#15#; -- PUSH 1
-            when 2 =>
-               pf.code(i).code := 16#14#; -- PUSH 0
-            when others =>
-               null;
-         end case;
-      end loop;
-      pf.PC := pf.code'First;
+      declare
+         i : Address;
+      begin
+         i := pf.code'First;
+         -- PUSH 0
+         pf.code(i) := PhiCode'(b => PCF_STACK, code => 16#14#, sel => 0);
+         i := i + 1;
+         while i < pf.code'Last - 2 loop
+            -- PUSH 1
+            pf.code(i) := PhiCode'(b => PCF_STACK, code => 16#15#, sel => 0);
+            i := i + 1;
+            -- ADDI
+            pf.code(i) := PhiCode'(b => PCF_STACK, code => 16#22#, sel => 0);
+            i := i + 1;
+         end loop;
+         -- UL
+         pf.code(i) := PhiCode'(b => PCF_STACK, code => 16#10#, sel => 0);
+         i := i + 1;
+         -- STORE
+         pf.code(i) := PhiCode'(b => PCF_STACK, code => 16#13#, sel => 0);
+         i := i + 1;
+      end;
+
 
       M := testInstructions / Integer(pf.cs);
       tb := Ada.Real_Time.Clock;
@@ -300,8 +329,7 @@ package body bvmkp is
       Put("Duration: ");
       Put_Line(Duration'Image(To_Duration(te - tb)));
       Put("Result: ");
-      Put_Line(Word32'Image(pf.accu(1).w));
-
+      Put_Line(Word32'Image(pf.frame.sData(0).w));
    end DoTest;
 
 end bvmkp;

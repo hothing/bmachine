@@ -8,10 +8,10 @@ with bvmkp;
 procedure Main is
 
 begin
-   Put_Line("VM-KS");
-   bvmks.DoTest;
-   Put_Line("VM-KF");
-   bvmkf.DoTest;
+   --Put_Line("VM-KS");
+   --bvmks.DoTest;
+   --Put_Line("VM-KF");
+   --bvmkf.DoTest;
    Put_Line("VM-KP");
    bvmkp.DoTest;
 end Main;
