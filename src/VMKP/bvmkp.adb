@@ -10,6 +10,7 @@ package body bvmkp is
    procedure call (self : in out PhiFunction) is
       c : PhiCode;
       s : PtrLocalData;
+      x : Boolean;
 
       procedure Dup is
       begin
@@ -63,6 +64,11 @@ package body bvmkp is
            IntToW32(W32ToInt(self.accu(self.atop).w) - 1);
       end DecInt;
 
+      procedure CopyW is
+      begin
+         s.sData(Word32(c.reg3)).w := s.sData(Word32(c.reg1)).w;
+      end CopyW;
+
       procedure UseLocal is
       begin
          s := self.frame;
@@ -98,64 +104,51 @@ package body bvmkp is
          end if;
       end Store;
 
-      -- 3Reg integer operations
-      procedure R3_AddInt is
+      procedure Jump is
+         old_pc : Address;
       begin
-         s.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
+         old_pc := self.PC;
+         self.PC := self.PC + Address(c.sel);
+         if not (self.PC in self.code'Range) then
+            self.PC := old_pc;
+            x := False;
+         end if;
+      end Jump;
+
+      procedure AddInt is
+      begin
+         if self.atop > self.accu'First then
+            self.atop :=self.atop - 1;
+            self.accu(self.atop).w :=
+              IntToW32(W32ToInt(self.accu(self.atop + 1).w)
                        +
-                         W32ToInt(s.sData(Word32(c.reg2)).w));
-      end R3_AddInt;
+                         W32ToInt(self.accu(self.atop).w));
 
-      procedure R3_SubInt is
-      begin
-         s.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
-                       -
-                         W32ToInt(s.sData(Word32(c.reg2)).w));
-      end R3_SubInt;
+         end if;
+      end AddInt;
 
-      procedure R3_MulInt is
-      begin
-         s.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
-                       *
-                         W32ToInt(s.sData(Word32(c.reg2)).w));
-      end R3_MulInt;
-
-      procedure R3_DivInt is
-      begin
-         s.sData(Word32(c.reg3)).w :=
-              IntToW32(W32ToInt(s.sData(Word32(c.reg1)).w)
-                       /
-                         W32ToInt(s.sData(Word32(c.reg2)).w));
-      end R3_DivInt;
-
+      pragma Inline(Dup, Drop, PushOne, PushZero, PushShortInt);
+      pragma Inline(AddInt);
    begin
       UseLocal;
       self.PC := self.code'First;
-      while self.PC in self.code'Range loop
+      x := True;
+      while (self.PC in self.code'Range) and x loop
          c := self.code(self.PC);
          case c.code is
-         when 16#00# => null;
-         when 16#01# =>
-            s.sData(Word32(c.reg3)).w := s.sData(Word32(c.reg1)).w;
-
-         when 16#02# => R3_AddInt;
-         when 16#03# => R3_SubInt;
-         when 16#04# => R3_MulInt;
-         when 16#05# => R3_DivInt;
-         when 16#F0# =>
-               declare
-                  old_pc : Address;
-               begin
-                  old_pc := self.PC;
-                  self.PC := self.PC + Address(c.sel);
-                  if not (self.PC in self.code'Range) then
-                     self.PC := old_pc;
-                     exit;
-                  end if;
-               end;
+            when 16#00# => null;
+            when 16#01# => CopyW;
+            when 16#02# => PushZero;
+            when 16#03# => PushOne;
+            when 16#04# => PushShortInt;
+            when 16#05# => Dup;
+            when 16#06# => Drop;
+            when 16#07# => IncInt;
+            when 16#08# => DecInt;
+            when 16#10# => Load;
+            when 16#12# => Store;
+            when 16#20# => AddInt;
+            when 16#F0# => Jump;
             when others => null;
          end case;
 
@@ -182,14 +175,11 @@ package body bvmkp is
       for i in pf.code'Range loop
          case i mod 3 is
             when 0 =>
-               pf.code(i).code := 16#02#;
-               pf.code(i).reg1 := 1;
-               pf.code(i).reg2 := 0;
-               pf.code(i).reg3 := 0;
+               pf.code(i).code := 16#02#; -- PUSH 0
             when 1 =>
-               pf.code(i).code := 16#08#; -- PUSH 1
+               pf.code(i).code := 16#03#; -- PUSH 1
             when 2 =>
-               pf.code(i).code := 16#07#; -- ADDI
+               pf.code(i).code := 16#20#; -- ADDI
             when others =>
                null;
          end case;
