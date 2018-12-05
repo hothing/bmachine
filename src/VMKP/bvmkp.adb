@@ -1,6 +1,9 @@
 with Ada.Real_Time; use Ada.Real_Time;
 with Ada.Text_IO; use Ada.Text_IO;
 
+with Ada.Numerics.Elementary_Functions;
+use Ada.Numerics.Elementary_Functions;
+
 package body bvmkp is
 
    ----------
@@ -142,8 +145,10 @@ package body bvmkp is
                atop := atop - 1;
             else
                -- TODO : reaction
-               rcb := false;
+               null;
             end if;
+         else
+            rcb := false;
          end if;
       end DivInt;
 
@@ -161,6 +166,173 @@ package body bvmkp is
             end if;
          end if;
       end ModUInt;
+
+      -- Floating-point instructions
+      procedure AddFloat32 is
+      begin
+         if atop > accu'First then
+            atop := atop - 1;
+            accu(atop).w :=
+              FloatToW32(
+                       W32ToFloat(accu(atop + 1).w)
+                       +
+                         W32ToFloat(accu(atop).w)
+                      );
+
+         else
+            rcb := false;
+         end if;
+      end AddFloat32;
+
+      procedure SubFloat32 is
+      begin
+         if atop > accu'First then
+            atop := atop - 1;
+            accu(atop).w :=
+              FloatToW32(
+                       W32ToFloat(accu(atop + 1).w)
+                       -
+                         W32ToFloat(accu(atop).w)
+                      );
+
+         else
+            rcb := false;
+         end if;
+      end SubFloat32;
+
+      procedure MulFloat32 is
+      begin
+         if atop > accu'First then
+            atop := atop - 1;
+            accu(atop).w :=
+              FloatToW32(
+                       W32ToFloat(accu(atop + 1).w)
+                       *
+                         W32ToFloat(accu(atop).w)
+                      );
+
+         else
+            rcb := false;
+         end if;
+      end MulFloat32;
+
+      procedure DivFloat32 is
+      begin
+         if atop > accu'First then
+            atop := atop - 1;
+            if W32ToFloat(accu(atop).w) /= 0.0 then
+               accu(atop).w :=
+                 FloatToW32(
+                            W32ToFloat(accu(atop + 1).w)
+                            /
+                              W32ToFloat(accu(atop).w)
+                           );
+            else
+               null;
+               -- Somehow we should inform a program about an exception
+               --  rcb := false;
+            end if;
+         else
+            rcb := false;
+         end if;
+      end DivFloat32;
+
+      procedure PushF32_Zero is
+      begin
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := FloatToW32(0.0);
+         else
+            rcb := false;
+         end if;
+      end PushF32_Zero;
+
+      procedure PushF32_One is
+      begin
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := FloatToW32(1.0);
+         else
+            rcb := false;
+         end if;
+      end PushF32_One;
+
+      procedure PushF32_E is
+      begin
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := FloatToW32(2.78);
+         else
+            rcb := false;
+         end if;
+      end PushF32_E;
+
+      procedure PushF32_Pi is
+      begin
+         if atop < accu'Last then
+            atop := atop + 1;
+            accu(atop).w := FloatToW32(3.14159);
+         else
+            rcb := false;
+         end if;
+      end PushF32_Pi;
+
+      procedure SinF32 is
+      begin
+         if atop in accu'Range then
+            accu(atop).w := FloatToW32(Sin(W32ToFloat(accu(atop).w)));
+         else
+            rcb := false;
+         end if;
+      end SinF32;
+
+      procedure CosF32 is
+      begin
+         if atop in accu'Range then
+            accu(atop).w := FloatToW32(Cos(W32ToFloat(accu(atop).w)));
+         else
+            rcb := false;
+         end if;
+      end CosF32;
+
+      procedure TanF32 is
+      begin
+         if atop in accu'Range then
+            accu(atop).w := FloatToW32(Tan(W32ToFloat(accu(atop).w)));
+         else
+            rcb := false;
+         end if;
+      end TanF32;
+
+      procedure CotF32 is
+      begin
+         if atop in accu'Range then
+            accu(atop).w := FloatToW32(Cot(W32ToFloat(accu(atop).w)));
+         else
+            rcb := false;
+         end if;
+      end CotF32;
+
+      procedure LnF32 is
+      begin
+         if atop in accu'Range then
+            accu(atop).w := FloatToW32(Log(W32ToFloat(accu(atop).w)));
+         else
+            rcb := false;
+         end if;
+      end LnF32;
+
+      procedure LogF32 is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            atop := atop - 1;
+            accu(atop).w := FloatToW32(Log(W32ToFloat(accu(atop).w), W32ToFloat(accu(atop + 1).w)));
+         else
+            rcb := false;
+         end if;
+      end LogF32;
+
+      -- Context change instructions
 
       procedure UseLocal is
       begin
@@ -266,6 +438,20 @@ package body bvmkp is
                when 16#22# => MulInt;
                when 16#23# => DivInt;
                when 16#24# => ModUInt;
+               when 16#30# => AddFloat32;
+               when 16#31# => SubFloat32;
+               when 16#32# => MulFloat32;
+               when 16#33# => DivFloat32;
+               when 16#34# => PushF32_Zero;
+               when 16#35# => PushF32_One;
+               when 16#36# => PushF32_Pi;
+               when 16#37# => PushF32_E;
+               when 16#40# => SinF32;
+               when 16#41# => CosF32;
+               when 16#42# => TanF32;
+               when 16#43# => CotF32;
+               when 16#44# => LnF32;
+               when 16#45# => LogF32;
                when 16#F0# => JumpUncond;
                when others => null;
             end case;
