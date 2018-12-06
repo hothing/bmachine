@@ -15,10 +15,19 @@ package body bvmkp is
       c : PhiCode;
       s : PtrLocalData;
 
+      -- Flags of execution
       rca, rcb : Boolean;
+
       -- Ariphmetic stack
       accu   : MemoryBlock(1 .. 7);
       atop   : Address := 0;
+      rlo    : Boolean; -- Result Of Logical Operation
+
+      -- GoBack addresses stack
+      type ADM is array (Address range 1 .. 8) of Address;
+
+      gbs   : ADM;
+      gtop  : Address := 0;
 
       -- Instructions
 
@@ -39,6 +48,28 @@ package body bvmkp is
             atop := atop - 1;
          end if;
       end Drop;
+
+      procedure Drop2 is
+      begin
+         if atop > accu'First then
+            accu(atop).w := 0;
+            atop := atop - 1;
+            accu(atop).w := 0;
+            atop := atop - 1;
+         end if;
+      end Drop2;
+
+      procedure Swap is
+         w : Word32;
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            w := accu(atop).w;
+            accu(atop).w := accu(atop - 1).w;
+            accu(atop - 1).w := w;
+         else
+            rcb := false;
+         end if;
+      end Swap;
 
       procedure PushZero is
       begin
@@ -167,8 +198,56 @@ package body bvmkp is
          end if;
       end ModUInt;
 
+      procedure CmpEqInt is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToInt(accu(atop).w) = W32ToInt(accu(atop - 1).w);
+            --atop := atop - 2;
+         else
+            rcb := false;
+         end if;
+      end CmpEqInt;
+
+      procedure CmpGtInt is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToInt(accu(atop).w) > W32ToInt(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpGtInt;
+
+      procedure CmpLtInt is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToInt(accu(atop).w) < W32ToInt(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpLtInt;
+
+      procedure CmpGeInt is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToInt(accu(atop).w) >= W32ToInt(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpGeInt;
+
+      procedure CmpLeInt is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToInt(accu(atop).w) <= W32ToInt(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpLeInt;
+
+
       -- Floating-point instructions
-      procedure AddFloat32 is
+
+      procedure AddF32 is
       begin
          if atop > accu'First then
             atop := atop - 1;
@@ -182,9 +261,9 @@ package body bvmkp is
          else
             rcb := false;
          end if;
-      end AddFloat32;
+      end AddF32;
 
-      procedure SubFloat32 is
+      procedure SubF32 is
       begin
          if atop > accu'First then
             atop := atop - 1;
@@ -198,9 +277,9 @@ package body bvmkp is
          else
             rcb := false;
          end if;
-      end SubFloat32;
+      end SubF32;
 
-      procedure MulFloat32 is
+      procedure MulF32 is
       begin
          if atop > accu'First then
             atop := atop - 1;
@@ -214,9 +293,9 @@ package body bvmkp is
          else
             rcb := false;
          end if;
-      end MulFloat32;
+      end MulF32;
 
-      procedure DivFloat32 is
+      procedure DivF32 is
       begin
          if atop > accu'First then
             atop := atop - 1;
@@ -235,7 +314,7 @@ package body bvmkp is
          else
             rcb := false;
          end if;
-      end DivFloat32;
+      end DivF32;
 
       procedure PushF32_Zero is
       begin
@@ -332,6 +411,70 @@ package body bvmkp is
          end if;
       end LogF32;
 
+      procedure CmpEqF32 is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToFloat(accu(atop).w) = W32ToFloat(accu(atop - 1).w);
+            --atop := atop - 2;
+         else
+            rcb := false;
+         end if;
+      end CmpEqF32;
+
+      procedure CmpGtF32 is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToFloat(accu(atop).w) > W32ToFloat(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpGtF32;
+
+      procedure CmpLtF32 is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToFloat(accu(atop).w) < W32ToFloat(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpLtF32;
+
+      procedure CmpGeF32 is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToFloat(accu(atop).w) >= W32ToFloat(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpGeF32;
+
+      procedure CmpLeF32 is
+      begin
+         if atop > accu'First and atop <= accu'Last then
+            rlo := W32ToFloat(accu(atop).w) <= W32ToFloat(accu(atop - 1).w);
+         else
+            rcb := false;
+         end if;
+      end CmpLeF32;
+
+      -- RLO operations
+
+      procedure SetRLO is
+      begin
+         rlo := true;
+      end SetRLO;
+
+      procedure ResetRLO is
+      begin
+         rlo := false;
+      end ResetRLO;
+
+      procedure InvertRLO is
+      begin
+         rlo := not rlo;
+      end InvertRLO;
+
+
       -- Context change instructions
 
       procedure UseLocal is
@@ -381,6 +524,46 @@ package body bvmkp is
          end if;
       end JumpUncond;
 
+      procedure JumpTrue is
+      begin
+         if rlo then
+            JumpUncond;
+         end if;
+      end JumpTrue;
+
+      procedure JumpFalse is
+      begin
+         if not rlo then
+            JumpUncond;
+         end if;
+      end JumpFalse;
+
+      procedure EnterLoop is
+      begin
+         if gtop < gbs'Last then
+            gtop := gtop + 1;
+            gbs(gtop) := f.PC + 1; -- do the loop from the next instr.
+            -- BUG: if this instruction will be last in a code block
+            -- the top value of stack became invalid
+         else
+            rcb := False;
+         end if;
+      end EnterLoop;
+
+      procedure NextLoop is
+      begin
+         if gtop in gbs'Range then
+            f.PC := gbs(gtop);
+         end if;
+      end NextLoop;
+
+      procedure ExitLoop is
+      begin
+         if gtop >= gbs'First then
+            gtop := gtop - 1;
+         end if;
+      end ExitLoop;
+
       procedure CallModuleFc is
          fn : PtrPhiFunction;
       begin
@@ -427,21 +610,24 @@ package body bvmkp is
                when 16#04# => PushShortInt;
                when 16#05# => Dup;
                when 16#06# => Drop;
-               when 16#07# => IncInt;
-               when 16#08# => DecInt;
+               when 16#07# => Drop2;
                when 16#10# => Load;
                when 16#12# => Store;
                when 16#14# => UseLocal;
                when 16#15# => UseUplevel(c.reg1);
+
                when 16#20# => AddInt;
                when 16#21# => SubInt;
                when 16#22# => MulInt;
                when 16#23# => DivInt;
                when 16#24# => ModUInt;
-               when 16#30# => AddFloat32;
-               when 16#31# => SubFloat32;
-               when 16#32# => MulFloat32;
-               when 16#33# => DivFloat32;
+               when 16#2E# => IncInt;
+               when 16#2F# => DecInt;
+
+               when 16#30# => AddF32;
+               when 16#31# => SubF32;
+               when 16#32# => MulF32;
+               when 16#33# => DivF32;
                when 16#34# => PushF32_Zero;
                when 16#35# => PushF32_One;
                when 16#36# => PushF32_Pi;
@@ -452,7 +638,30 @@ package body bvmkp is
                when 16#43# => CotF32;
                when 16#44# => LnF32;
                when 16#45# => LogF32;
-               when 16#F0# => JumpUncond;
+
+               when 16#A0# => CmpEqInt;
+               when 16#A1# => CmpGtInt;
+               when 16#A2# => CmpLtInt;
+               when 16#A3# => CmpGeInt;
+               when 16#A4# => CmpLeInt;
+               when 16#A5# => CmpEqF32;
+               when 16#A6# => CmpGtF32;
+               when 16#A7# => CmpLtF32;
+               when 16#A8# => CmpGeF32;
+               when 16#A9# => CmpLeF32;
+
+               when 16#D0# => SetRLO;
+               when 16#D1# => ResetRLO;
+               when 16#D2# => InvertRLO;
+
+               when 16#E0# => JumpUncond;
+               when 16#E1# => JumpTrue;
+               when 16#E2# => JumpFalse;
+
+               when 16#E3# => EnterLoop;
+               when 16#E4# => NextLoop;
+               when 16#E5# => ExitLoop;
+
                when others => null;
             end case;
             f.PC := f.PC + 1;
