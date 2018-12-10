@@ -1,7 +1,9 @@
 project Bmachine is
 
+   for Source_Dirs use ("src", "src/VMKR", "src/VMKS");
    for Object_Dir use "obj";
    for Main use ("main.adb");
+   
    type GenAsm_Type is
       ("Yes", "No");
    GenAsm : GenAsm_Type := external ("GenAsm", "No");
@@ -17,15 +19,6 @@ project Bmachine is
 
       end case;
    end Compiler;
-
-   case GenAsm is
-
-      when "Yes" =>
-         for Source_Dirs use ("src", "src/VMKP", "src/VMKF", "src/VMKS");
-
-      when "No" =>
-         for Source_Dirs use ("src", "src/VMKP", "src/VMKF", "src/VMKS");
-   end case;
 
 end Bmachine;
 
